@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { auth, provider } from "@/firebase";
 
@@ -36,11 +37,6 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <Link
-            href="/"
-            className="inline-block mb-8 text-2xl font-bold text-foreground"
-          >
-            StudyHub
           </Link>
           <h1 className="text-3xl font-bold mb-3">Welcome back</h1>
           <p className="text-muted-foreground text-lg">Sign in to your account</p>

@@ -158,7 +158,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 mb-8 group">
             <div className="relative">
@@ -178,7 +177,6 @@ export default function LoginPage() {
           <p className="text-muted-foreground text-lg">Sign in to your account</p>
         </div>
 
-        {/* Login Form */}
         <div className="card-elevated p-8">
           {error && (
             <div className="mb-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
@@ -202,7 +200,7 @@ export default function LoginPage() {
                 disabled={loading}
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-semibold mb-3 text-foreground">
                 Password

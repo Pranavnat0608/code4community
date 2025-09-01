@@ -9,11 +9,11 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function SignupPage() {
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const [emailError, setEmailError] = useState("");
@@ -178,24 +178,9 @@ export default function SignupPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-medium">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (user && userData) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-3 mb-8 group">
             <div className="relative">
@@ -336,21 +321,12 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full btn-outline flex items-center justify-center gap-3 py-4 text-base"
             >
-              {loading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-primary border-t-transparent mr-2"></div>
-                  Creating Account...
-                </div>
-              ) : (
-                <>
-                  <img
-                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                    alt="Google logo"
-                    className="w-6 h-6"
-                  />
-                  Continue with Google
-                </>
-              )}
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google logo"
+                className="w-6 h-6"
+              />
+              Continue with Google
             </button>
           </div>
 

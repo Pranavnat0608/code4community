@@ -417,7 +417,7 @@ export default function MathLabPage() {
                   </h1>
                   
                   <p className="text-xl text-gray-600 max-w-lg mx-auto leading-relaxed">
-                    We're searching for the perfect tutor for {studentRequest.course}
+                    We&apos;re searching for the perfect tutor for {studentRequest.course}
                   </p>
                 </>
               ) : (

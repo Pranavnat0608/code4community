@@ -476,11 +476,11 @@ export default function MathLabPage() {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="text-center">
                   <p className="text-sm text-gray-500">
-                    Request submitted at {studentRequest.createdAt.toLocaleTimeString()}
+                    Request submitted at {studentRequest.createdAt?.toLocaleTimeString() || 'Unknown time'}
                   </p>
                   {studentRequest.status === 'accepted' && (
                     <p className="text-sm text-gray-500 mt-1">
-                      Accepted at {studentRequest.acceptedAt.toLocaleTimeString()}
+                      Accepted at {studentRequest.acceptedAt?.toLocaleTimeString() || 'Unknown time'}
                     </p>
                   )}
                 </div>
@@ -608,7 +608,7 @@ export default function MathLabPage() {
               </button>
               
               <p className="text-sm text-gray-500 mt-4">
-                Session started at {activeSession.startTime.toLocaleTimeString()}
+                Session started at {activeSession.startTime?.toLocaleTimeString() || 'Unknown time'}
               </p>
             </div>
           </div>

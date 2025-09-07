@@ -1,10 +1,14 @@
 "use client";
 import { useAuth } from "../../components/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
-import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot } from "firebase/firestore";
+import LoadingSpinner from "../../components/LoadingSpinner";
+import { AppCardSkeleton, RequestCardSkeleton } from "../../components/SkeletonLoader";
+import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, deleteDoc } from "firebase/firestore";
 import { firestore } from "@/firebase";
+import { MathLabCache, UserCache, CachePerformance, CacheInvalidation } from "@/utils/cache";
+import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
 
 export default function MathLabPage() {
   const { user, userData } = useAuth();
@@ -21,55 +25,161 @@ export default function MathLabPage() {
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [studentRequest, setStudentRequest] = useState(null);
+  const [roleChangeMessage, setRoleChangeMessage] = useState("");
 
-  // Available courses
-  const courses = [
+  // Available courses - memoized for performance
+  const courses = useMemo(() => [
     "Algebra 1",
-    "Geometry", 
-    "Functions",
     "Algebra 2",
-    "Algebra 2 Trig"
-  ];
+    "Algebra 2 Trig",
+    "Functions",
+    "Trig with Adv Alg",
+    "Geometry"
+  ], []);
+
+  // Function to generate initials from name
+  const getInitials = (name) => {
+    if (!name) return '?';
+    const words = name.trim().split(' ');
+    if (words.length === 1) {
+      return words[0].substring(0, 2).toUpperCase();
+    }
+    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+  };
+
+  // Custom image component with proper Google URL handling
+  const ProfileImage = ({ src, alt, name, className, showOnlineIndicator = false }) => {
+    const [imageError, setImageError] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Fix Google URLs to work properly
+    const getFixedImageUrl = (url) => {
+      if (!url) return null;
+      
+      // If it's a Google URL, fix the format
+      if (url.includes('lh3.googleusercontent.com')) {
+        // Remove any existing size parameters and add proper ones
+        let cleanUrl = url.split('=')[0];
+        // Ensure it has the proper format for a 96px image
+        return `${cleanUrl}=s96-c`;
+      }
+      
+      return url;
+    };
+
+    const fixedSrc = getFixedImageUrl(src);
+    const resolvedSrc = fixedSrc && fixedSrc.includes('lh3.googleusercontent.com')
+      ? `/api/avatar?u=${encodeURIComponent(src)}&sz=96`
+      : fixedSrc;
+
+    const handleError = () => {
+      setImageError(true);
+      setIsLoading(false);
+    };
+
+    const handleLoad = () => {
+      setIsLoading(false);
+      setImageError(false);
+    };
+
+    // Show initials if no src, error, or while loading
+    if (!resolvedSrc || imageError) {
+      return (
+        <div 
+          className={`${className} flex items-center justify-center`}
+          style={{ 
+            background: `linear-gradient(135deg, hsl(${Math.abs(name?.charCodeAt(0) || 0) % 360}, 70%, 50%), hsl(${Math.abs(name?.charCodeAt(1) || 0) % 360}, 70%, 50%))`
+          }}
+        >
+          <span className="text-white font-semibold text-sm">
+            {getInitials(name)}
+          </span>
+          {showOnlineIndicator && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative">
+        <img 
+          src={resolvedSrc} 
+          alt={alt}
+          className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
+          loading="lazy"
+          onLoad={handleLoad}
+          onError={handleError}
+        />
+        {isLoading && (
+          <div 
+            className={`${className} absolute inset-0 flex items-center justify-center`}
+            style={{ 
+              background: `linear-gradient(135deg, hsl(${Math.abs(name?.charCodeAt(0) || 0) % 360}, 70%, 50%), hsl(${Math.abs(name?.charCodeAt(1) || 0) % 360}, 70%, 50%))`
+            }}
+          >
+            <span className="text-white font-semibold text-sm">
+              {getInitials(name)}
+            </span>
+          </div>
+        )}
+        {showOnlineIndicator && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></div>
+        )}
+      </div>
+    );
+  };
 
   // No custom filtering — native select handles searching
 
-  // Simple caching to prevent loading delay
+  // Optimized caching with intelligent cache management
   useEffect(() => {
-    const cached = localStorage.getItem('brhs_user_cache');
+    const timing = CachePerformance.startTiming('loadCachedUser');
+    
+    // Try to get cached user data immediately
+    const cached = UserCache.getUserData();
     if (cached) {
-      try {
-        const user = JSON.parse(cached);
-        setCachedUser(user);
-        // Check if user has chosen a math lab role
-        if (!user.mathLabRole) {
-          setShowRoleSelection(true);
-        }
-      } catch (e) {
-        localStorage.removeItem('brhs_user_cache');
+      setCachedUser(cached);
+      // Check role selection - always check current role
+      if (!cached.mathLabRole) {
+        setShowRoleSelection(true);
+      } else {
+        setShowRoleSelection(false);
       }
     }
+    
+    CachePerformance.endTiming(timing);
   }, []);
 
-  // Update cache when userData changes
+  // Optimized cache update with smart invalidation
   useEffect(() => {
     if (userData && user) {
+      const timing = CachePerformance.startTiming('updateUserCache');
+      
       // Combine Firebase Auth user with Firestore data
       const combinedUserData = {
         ...userData,
         uid: user.uid,
         email: user.email
       };
-      localStorage.setItem('brhs_user_cache', JSON.stringify(combinedUserData));
+      
+      // Update cache using centralized cache manager
+      UserCache.setUserData(combinedUserData);
       setCachedUser(combinedUserData);
-      // Check if user has chosen a math lab role
+      
+      // Check role selection - always check current role
       if (!userData.mathLabRole) {
         setShowRoleSelection(true);
+      } else {
+        setShowRoleSelection(false);
       }
+      
+      CachePerformance.endTiming(timing);
     }
   }, [userData, user]);
 
-  // Use cached user if available, fallback to real userData
-  const displayUser = userData || cachedUser;
+  // Use cached user if available, fallback to real userData - memoized for performance
+  const displayUser = useMemo(() => userData || cachedUser, [userData, cachedUser]);
 
   // Redirect to login if not authenticated (use cached user if available)
   useEffect(() => {
@@ -118,6 +228,7 @@ export default function MathLabPage() {
       };
     }
   }, [displayUser?.mathLabRole, user?.uid, cachedUser?.uid]);
+
 
   // Session timer effect
   useEffect(() => {
@@ -185,6 +296,9 @@ export default function MathLabPage() {
           unsubscribe();
         }
       };
+    } else {
+      // If not a student, clear any existing student request state
+      setStudentRequest(null);
     }
   }, [displayUser?.mathLabRole, user?.uid, cachedUser?.uid]);
 
@@ -208,6 +322,7 @@ export default function MathLabPage() {
         studentId: user?.uid || cachedUser?.uid,
         studentName: displayUser?.displayName || displayUser?.firstName + ' ' + displayUser?.lastName || user?.email || 'Anonymous Student',
         studentEmail: user?.email || cachedUser?.email,
+        studentPhotoURL: user?.photoURL || displayUser?.photoURL || cachedUser?.photoURL || null,
         course: selectedCourse,
         status: 'pending',
         createdAt: new Date(),
@@ -234,12 +349,26 @@ export default function MathLabPage() {
   };
 
   // Function to fetch pending requests for tutors
-  const fetchPendingRequests = () => {
+  // Optimized fetchPendingRequests with intelligent caching
+  const fetchPendingRequests = useCallback(() => {
     if (displayUser?.mathLabRole !== 'tutor') {
       return () => {}; // Return empty cleanup function
     }
     
+    const timing = CachePerformance.startTiming('fetchPendingRequests');
+    
+    // Try to load from cache first, but always refresh for real-time data
+    const cachedRequests = MathLabCache.getRequests();
+    if (cachedRequests && cachedRequests.length >= 0) {
+      setPendingRequests(cachedRequests);
+      setIsLoadingRequests(false);
+    } else {
+      setIsLoadingRequests(true);
+    }
+    
+    // Always fetch fresh data for real-time updates
     setIsLoadingRequests(true);
+    
     try {
       const q = query(
         collection(firestore, "tutoringRequests"),
@@ -251,17 +380,23 @@ export default function MathLabPage() {
         snapshot.forEach((doc) => {
           requests.push({ id: doc.id, ...doc.data() });
         });
+        
+        // Cache the requests
+        MathLabCache.setRequests(requests);
         setPendingRequests(requests);
         setIsLoadingRequests(false);
+        
+        CachePerformance.endTiming(timing);
       });
 
       return unsubscribe;
     } catch (error) {
       console.error("Error fetching requests:", error);
       setIsLoadingRequests(false);
+      CachePerformance.endTiming(timing);
       return () => {}; // Return empty cleanup function on error
     }
-  };
+  }, [displayUser?.mathLabRole]);
 
   // Helper function to format time
   const formatTime = (seconds) => {
@@ -275,16 +410,79 @@ export default function MathLabPage() {
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Function to cancel student request
+  // Function to clean up old/expired requests (for future history system)
+  const cleanupOldRequests = useCallback(async () => {
+    try {
+      const now = new Date();
+      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
+      
+      // Query only by status first to avoid composite index requirement
+      const pendingRequestsQuery = query(
+        collection(firestore, "tutoringRequests"),
+        where("status", "==", "pending")
+      );
+      
+      const snapshot = await getDocs(pendingRequestsQuery);
+      const batch = [];
+      
+      // Filter by createdAt on the client side to avoid composite index
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        
+        if (createdAt < oneDayAgo) {
+          batch.push(deleteDoc(doc.ref));
+        }
+      });
+      
+      if (batch.length > 0) {
+        await Promise.all(batch);
+        // Clear cache after cleanup
+        MathLabCache.clearAll();
+      }
+    } catch (error) {
+      console.error("Error cleaning up old requests:", error);
+    }
+  }, []);
+
+  // Cleanup old requests periodically
+  useEffect(() => {
+    // Run cleanup immediately when component mounts
+    cleanupOldRequests();
+    
+    // Set up periodic cleanup every 30 minutes
+    const cleanupInterval = setInterval(cleanupOldRequests, 30 * 60 * 1000);
+    
+    return () => clearInterval(cleanupInterval);
+  }, [cleanupOldRequests]);
+
+  // Refresh cache when page becomes visible to prevent stale data
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && displayUser) {
+        // Page became visible, refresh cache
+        MathLabCache.clearAll();
+        if (displayUser.mathLabRole === 'tutor') {
+          fetchPendingRequests();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [displayUser, fetchPendingRequests]);
+
+  // Function to cancel student request - now deletes from database
   const handleCancelRequest = async () => {
     if (!studentRequest) return;
     
     try {
-      await updateDoc(doc(firestore, "tutoringRequests", studentRequest.id), {
-        status: 'cancelled',
-        cancelledAt: new Date(),
-        updatedAt: new Date()
-      });
+      // Delete the request from the database instead of marking as cancelled
+      await deleteDoc(doc(firestore, "tutoringRequests", studentRequest.id));
+      
+      // Clear cache to reflect the deletion
+      MathLabCache.clearAll();
+      invalidateOnDataChange('tutoring_request', 'cancelled');
       
       setStudentRequest(null);
     } catch (error) {
@@ -293,18 +491,17 @@ export default function MathLabPage() {
     }
   };
 
-  // Function to end tutoring session
+  // Function to end tutoring session - now deletes the request after completion
   const handleEndSession = async () => {
     if (!activeSession) return;
     
     try {
-      // Update the request status to completed
-      await updateDoc(doc(firestore, "tutoringRequests", activeSession.requestId), {
-        status: 'completed',
-        sessionDuration: sessionDuration,
-        endedAt: new Date(),
-        updatedAt: new Date()
-      });
+      // Delete the request from the database after session completion
+      await deleteDoc(doc(firestore, "tutoringRequests", activeSession.requestId));
+      
+      // Clear cache to reflect the deletion
+      MathLabCache.clearAll();
+      invalidateOnDataChange('tutoring_session', 'ended');
 
       // Clear session state
       setActiveSession(null);
@@ -368,16 +565,77 @@ export default function MathLabPage() {
         throw new Error("User ID not found. Please try refreshing the page.");
       }
 
+      // Check if user is switching roles
+      const currentRole = cachedUser?.mathLabRole;
+      const isSwitchingToTutor = currentRole === 'student' && mathLabRole === 'tutor';
+      const isSwitchingToStudent = currentRole === 'tutor' && mathLabRole === 'student';
+      
+      // If switching to tutor, cancel any active student requests first
+      if (isSwitchingToTutor) {
+        try {
+          // Find and cancel any pending student requests
+          const studentRequestsQuery = query(
+            collection(firestore, "tutoringRequests"),
+            where("studentId", "==", userId),
+            where("status", "in", ["pending", "accepted"])
+          );
+          
+          const studentRequestsSnapshot = await getDocs(studentRequestsQuery);
+          const requestsToCancel = [];
+          
+          studentRequestsSnapshot.forEach((doc) => {
+            requestsToCancel.push(deleteDoc(doc.ref));
+          });
+          
+          if (requestsToCancel.length > 0) {
+            await Promise.all(requestsToCancel);
+            
+            // Clear any local student request state
+            setStudentRequest(null);
+            
+            // Show message to user
+            setRoleChangeMessage(`Switched to tutor role. Cancelled ${requestsToCancel.length} active student request(s).`);
+            setTimeout(() => setRoleChangeMessage(""), 5000);
+          }
+        } catch (cancelError) {
+          console.error("Error cancelling student requests:", cancelError);
+          // Continue with role update even if cancellation fails
+        }
+      }
+      
+      // If switching to student, clear any active tutor sessions
+      if (isSwitchingToStudent) {
+        // Clear any active session state
+        setActiveSession(null);
+        setSessionStartTime(null);
+        setSessionDuration(0);
+        setPendingRequests([]);
+        
+        // Show message to user
+        setRoleChangeMessage("Switched to student role. Any active tutor sessions have been cleared.");
+        setTimeout(() => setRoleChangeMessage(""), 5000);
+      }
+
       // Update Firestore
       await updateDoc(doc(firestore, "users", userId), {
         mathLabRole: mathLabRole,
         updatedAt: new Date()
       });
 
-      // Update local cache
+      // Update local cache using centralized cache manager
       const updatedUser = { ...cachedUser, mathLabRole };
-      localStorage.setItem('brhs_user_cache', JSON.stringify(updatedUser));
+      UserCache.setUserData(updatedUser);
       setCachedUser(updatedUser);
+      
+      // Invalidate related caches to prevent stale data
+      invalidateOnDataChange('mathlab_role', 'update');
+      
+      // Trigger a custom event to force AuthContext refresh
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('userRoleChanged', { 
+          detail: { newRole: mathLabRole, userId } 
+        }));
+      }
 
       // Hide role selection
       setShowRoleSelection(false);
@@ -399,7 +657,7 @@ export default function MathLabPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         <DashboardTopBar 
-          title="BRHS Math Lab - Finding Tutor" 
+          title="BRHS Math Lab" 
           showNavLinks={false}
         />
 
@@ -407,10 +665,45 @@ export default function MathLabPage() {
           <div className="max-w-2xl w-full">
             {/* Matching Header */}
             <div className="text-center mb-12">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-primary/10 rounded-full mb-6">
-                <svg className="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+              <div className="relative w-32 h-32 mb-6 mx-auto">
+                <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <svg 
+                    className="w-12 h-12 text-primary search-scan-animation" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                    style={{
+                      animation: 'searchScan 3s ease-in-out infinite'
+                    }}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <style jsx>{`
+                  @keyframes searchScan {
+                    0% {
+                      transform: translate(0, 0) scale(1);
+                      opacity: 1;
+                    }
+                    25% {
+                      transform: translate(8px, -6px) scale(1.05);
+                      opacity: 0.9;
+                    }
+                    50% {
+                      transform: translate(-6px, 8px) scale(1.1);
+                      opacity: 0.95;
+                    }
+                    75% {
+                      transform: translate(6px, 4px) scale(1.05);
+                      opacity: 0.9;
+                    }
+                    100% {
+                      transform: translate(0, 0) scale(1);
+                      opacity: 1;
+                    }
+                  }
+                `}</style>
               </div>
               
               {studentRequest.status === 'pending' ? (
@@ -476,11 +769,11 @@ export default function MathLabPage() {
               <div className="mt-6 pt-6 border-t border-gray-200">
                 <div className="text-center">
                   <p className="text-sm text-gray-500">
-                    Request submitted at {studentRequest.createdAt?.toLocaleTimeString() || 'Unknown time'}
+                    Request submitted at {studentRequest.createdAt?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
                   </p>
                   {studentRequest.status === 'accepted' && (
                     <p className="text-sm text-gray-500 mt-1">
-                      Accepted at {studentRequest.acceptedAt?.toLocaleTimeString() || 'Unknown time'}
+                      Accepted at {studentRequest.acceptedAt?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
                     </p>
                   )}
                 </div>
@@ -608,7 +901,7 @@ export default function MathLabPage() {
               </button>
               
               <p className="text-sm text-gray-500 mt-4">
-                Session started at {activeSession.startTime?.toLocaleTimeString() || 'Unknown time'}
+                Session started at {activeSession.startTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
               </p>
             </div>
           </div>
@@ -776,11 +1069,11 @@ export default function MathLabPage() {
             <div className="text-center">
               <button
                 onClick={handleRoleSelection}
-                disabled={isUpdating || !mathLabRole}
+                disabled={isUpdating || !mathLabRole || mathLabRole === displayUser?.mathLabRole}
                 className={`px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                  mathLabRole 
+                  mathLabRole && mathLabRole !== displayUser?.mathLabRole
                     ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30' 
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                 }`}
               >
                 {isUpdating ? (
@@ -825,68 +1118,118 @@ export default function MathLabPage() {
         showNavLinks={false} // Don't show navigation links on math lab page
       />
 
+      {/* Role Change Message */}
+      {roleChangeMessage && (
+        <div className="bg-blue-50 border-l-4 border-blue-400 p-4 mx-6 mt-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">{roleChangeMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
         {displayUser.mathLabRole === 'tutor' ? (
-          // Tutor Dashboard
-          <div className="max-w-4xl w-full mx-4">
+          // Tutor Dashboard - Redesigned with Horizontal Grid
+          <div className="max-w-7xl w-full mx-4">
+            {/* Header Section */}
             <div className="text-center mb-8">
-              <h2 className="text-3xl font-bold text-foreground mb-4">Tutor Dashboard</h2>
-              <p className="text-lg text-muted-foreground">
-                View and accept pending tutoring requests from students
-              </p>
+              <h2 className="text-4xl font-bold text-foreground mb-4">Tutor Dashboard</h2>
             </div>
 
-            {/* Pending Requests */}
-            <div className="card-elevated p-6">
-              <h3 className="text-xl font-semibold text-foreground mb-4">Pending Requests</h3>
+
+            {/* Pending Requests Grid */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-2xl font-bold text-foreground">Tutoring Requests</h3>
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>Updated in real-time</span>
+                </div>
+              </div>
               
               {isLoadingRequests ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Loading requests...</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <RequestCardSkeleton />
+                  <RequestCardSkeleton />
+                  <RequestCardSkeleton />
                 </div>
               ) : pendingRequests.length === 0 ? (
-                <div className="text-center py-8">
-                  <svg className="w-16 h-16 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <p className="text-muted-foreground">No pending requests at the moment</p>
-                  <p className="text-sm text-muted-foreground mt-2">Students will appear here when they submit tutoring requests</p>
+                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl border-2 border-dashed border-gray-300 dark:border-gray-600">
+                  <div className="max-w-md mx-auto">
+                    <div className="w-24 h-24 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                      </svg>
+                    </div>
+                    <h4 className="text-xl font-semibold text-foreground mb-2">No Requests Yet</h4>
+                    <p className="text-muted-foreground mb-4">Students will appear here when they submit tutoring requests</p>
+                    <div className="inline-flex items-center px-4 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Waiting for students...
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {pendingRequests.map((request) => (
-                    <div key={request.id} className="border border-border rounded-lg p-4 bg-card">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-2">
-                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                              <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                            </div>
-                            <div>
-                              <h4 className="font-semibold text-foreground">{request.studentName}</h4>
-                              <p className="text-sm text-muted-foreground">{request.studentEmail}</p>
-                            </div>
-                          </div>
-                          <div className="ml-13">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                              {request.course}
-                            </span>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Requested {request.createdAt?.toDate ? request.createdAt.toDate().toLocaleString() : 'Recently'}
-                            </p>
-                          </div>
+                    <div key={request.id} className="bg-white border-2 border-gray-400 rounded-2xl p-6 shadow-2xl shadow-gray-400/80 transition-all duration-300 hover:-translate-y-1 hover:shadow-3xl hover:shadow-gray-500/90">
+                      {/* Student Info Header */}
+                      <div className="flex items-center space-x-4 mb-4">
+                        <ProfileImage
+                          src={request.studentPhotoURL}
+                          alt={request.studentName}
+                          name={request.studentName}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-white dark:border-gray-800"
+                          showOnlineIndicator={true}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 text-lg truncate">{request.studentName}</h4>
+                          <p className="text-sm text-gray-600 truncate">Student</p>
                         </div>
-                        <button
-                          onClick={() => handleAcceptRequest(request.id, request.studentId, request.course)}
-                          className="btn-primary px-4 py-2 text-sm"
-                        >
-                          Accept Request
-                        </button>
                       </div>
+
+                      {/* Course Badge */}
+                      <div className="mb-4">
+                        <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-primary/10 text-primary border border-primary/20">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                          </svg>
+                          {request.course}
+                        </span>
+                      </div>
+
+                      {/* Request Time */}
+                      <div className="flex items-center text-sm text-gray-600 mb-6">
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Requested {request.createdAt?.toDate ? request.createdAt.toDate().toLocaleString([], {hour: '2-digit', minute:'2-digit', month: 'short', day: 'numeric'}) : 'Recently'}</span>
+                      </div>
+
+                      {/* Action Button */}
+                      <button
+                        onClick={() => handleAcceptRequest(request.id, request.studentId, request.course)}
+                        className="w-full bg-primary hover:bg-primary/90 text-white font-semibold py-3 px-4 rounded-xl transition-all duration-200 hover:shadow-lg hover:shadow-primary/25 transform hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <div className="flex items-center justify-center space-x-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>Accept Request</span>
+                        </div>
+                      </button>
                     </div>
                   ))}
                 </div>

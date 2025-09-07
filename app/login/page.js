@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { auth, provider, firestore } from "@/firebase";
+import { auth, provider, firestore, fetchSignInMethodsForEmail } from "@/firebase";
+import { UserCache, CachePerformance, CacheInvalidation } from "@/utils/cache";
 import { useAuth } from "@/components/AuthContext";
 import Link from "next/link";
 import Image from "next/image";
@@ -44,19 +45,61 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+      
+      // Check if email is verified
+      if (!user.emailVerified) {
+        // Sign out the user since email is not verified
+        await auth.signOut();
+        setError("Please verify your email before signing in. Check your inbox for a verification link.");
+        return;
+      }
+      
       // Redirect will be handled by useEffect above
     } catch (error) {
       console.error("Login error:", error);
       
       if (error.code === "auth/user-not-found") {
-        setError("No account found with this email. Please sign up first.");
+        // Check if email is associated with Google account
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+          if (signInMethods.includes("google.com")) {
+            setError("No account found with this email and password. Please sign in with Google instead.");
+          } else {
+            setError("No account found with this email. Please sign up first.");
+          }
+        } catch (fetchError) {
+          setError("No account found with this email. Please sign up first.");
+        }
       } else if (error.code === "auth/wrong-password") {
-        setError("Incorrect password. Please try again.");
+        // Check if email is associated with Google account
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+          if (signInMethods.includes("google.com")) {
+            setError("Incorrect password. This email is associated with a Google account. Please sign in with Google instead.");
+          } else {
+            setError("Incorrect password. Please try again.");
+          }
+        } catch (fetchError) {
+          setError("Incorrect password. Please try again.");
+        }
       } else if (error.code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else if (error.code === "auth/too-many-requests") {
         setError("Too many failed attempts. Please try again later.");
+      } else if (error.code === "auth/invalid-credential") {
+        // Check if email is associated with Google account
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+          if (signInMethods.includes("google.com")) {
+            setError("Invalid credentials. This email is associated with a Google account. Please sign in with Google instead.");
+          } else {
+            setError("Invalid credentials. Please check your email and password.");
+          }
+        } catch (fetchError) {
+          setError("Invalid credentials. Please check your email and password.");
+        }
       } else {
         setError("Login failed. Please check your credentials and try again.");
       }
@@ -89,29 +132,53 @@ export default function LoginPage() {
             updatedAt: new Date()
           });
           
-          // Don't redirect here - let the useEffect handle it after user data is loaded
-          return;
+          // Refresh user data to ensure it's loaded
+          await refreshUserData();
+          
+          // Cache user data for immediate availability after redirect
+          const userData = {
+            email: user.email,
+            displayName: user.displayName || "",
+            photoURL: user.photoURL || "",
+            role: "student",
+            mathLabRole: "",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            uid: user.uid
+          };
+          UserCache.setUserData(userData);
         } catch (createError) {
           console.error("Error creating user account:", createError);
           setError("Failed to create account. Please try again.");
           setLoading(false);
           return;
         }
-      }
-      
-      // Sync photoURL from Firebase Auth with Firestore
-      const userData = userDoc.data();
-      if (user.photoURL && userData.photoURL !== user.photoURL) {
-        try {
-          await updateDoc(doc(firestore, "users", user.uid), {
-            photoURL: user.photoURL
-          });
-        } catch (error) {
-          console.error("Error updating photoURL:", error);
+      } else {
+        // Sync photoURL from Firebase Auth with Firestore
+        const userData = userDoc.data();
+        if (user.photoURL && userData.photoURL !== user.photoURL) {
+          try {
+            await updateDoc(doc(firestore, "users", user.uid), {
+              photoURL: user.photoURL
+            });
+          } catch (error) {
+            console.error("Error updating photoURL:", error);
+          }
         }
+        
+        // Cache user data for immediate availability after redirect
+        UserCache.setUserData(userData);
       }
       
-      // Don't redirect here - let the useEffect handle it after user data is loaded
+      // Add a small delay to ensure AuthContext is updated before redirecting
+      setTimeout(() => {
+        const redirectTo = getRedirectUrl();
+        if (redirectTo) {
+          router.push(redirectTo);
+        } else {
+          router.push("/mathlab");
+        }
+      }, 100);
     } catch (error) {
       console.error("Google login error:", error);
       if (error.code === "auth/popup-closed-by-user") {

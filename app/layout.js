@@ -1,6 +1,8 @@
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { generateCSPHeader } from "@/utils/security";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +20,20 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "BRHSTools",
-  description: "Useful tools for BRHS",
+  title: "BRHS Utilities",
+  description: "Useful Applications for BRHS",
+  icons: {
+    icon: [
+      { url: '/spartan.png', sizes: '32x32', type: 'image/png' },
+      { url: '/spartan.png', sizes: '16x16', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/spartan.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
+  other: {
+    'Content-Security-Policy': generateCSPHeader(),
+  },
 };
 
 export default function RootLayout({ children }) {
@@ -31,12 +45,10 @@ export default function RootLayout({ children }) {
             __html: `
               // Force normal zoom level
               if (window.devicePixelRatio !== 1) {
-                console.log('Device pixel ratio:', window.devicePixelRatio);
               }
               
               // Check if browser zoom is not 100%
               if (window.outerWidth / window.innerWidth !== 1) {
-                console.log('Browser zoom detected, attempting to reset...');
                 document.body.style.zoom = '1';
                 document.body.style.transform = 'none';
               }
@@ -53,7 +65,9 @@ export default function RootLayout({ children }) {
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
+        <ErrorBoundary>
+          <AuthProvider>{children}</AuthProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

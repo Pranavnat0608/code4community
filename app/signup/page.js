@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, provider, firestore } from "@/firebase";
 import { signInWithPopup, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthContext";
 import Link from "next/link";
 import Image from "next/image";
@@ -111,17 +111,23 @@ export default function SignupPage() {
       
       // Send email verification
       try {
-        await sendEmailVerification(user);
+        await sendEmailVerification(user, {
+          url: `${window.location.origin}/verify-email`,
+          handleCodeInApp: false
+        });
       } catch (verificationError) {
         console.error("Email verification error:", verificationError);
       }
       
-      // Redirect to math lab page
-      router.push("/mathlab");
+      // Sign out the user so they must verify email before accessing the app
+      await auth.signOut();
+      
+      // Redirect to check email page
+      router.push("/check-email?email=" + encodeURIComponent(user.email));
     } catch (err) {
       console.error("Email signup error", err);
       if (err.code === "auth/email-already-in-use") {
-        setError("An account with this email already exists. Please sign in instead.");
+        setError("An account with this email already exists. Please sign in with Google instead, or use a different email address.");
       } else if (err.code === "auth/invalid-email") {
         setError("Please enter a valid email address.");
       } else if (err.code === "auth/weak-password") {
@@ -142,28 +148,42 @@ export default function SignupPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       
-      // Check if user already exists
+      // Check if user exists in our database
       const userDoc = await getDoc(doc(firestore, "users", user.uid));
       
-      if (userDoc.exists()) {
-        setError("You already have an account. Please sign in instead.");
-        setLoading(false);
-        return;
+      if (!userDoc.exists()) {
+        // User doesn't exist, create account automatically
+        try {
+          await setDoc(doc(firestore, "users", user.uid), {
+            email: user.email,
+            displayName: user.displayName || "",
+            photoURL: user.photoURL || "",
+            role: "student", // Default role
+            mathLabRole: "", // Empty math lab role - user will choose later
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+        } catch (createError) {
+          console.error("Error creating user account:", createError);
+          setError("Failed to create account. Please try again.");
+          setLoading(false);
+          return;
+        }
+      } else {
+        // User exists, sync photoURL from Firebase Auth with Firestore
+        const userData = userDoc.data();
+        if (user.photoURL && userData.photoURL !== user.photoURL) {
+          try {
+            await updateDoc(doc(firestore, "users", user.uid), {
+              photoURL: user.photoURL
+            });
+          } catch (error) {
+            console.error("Error updating photoURL:", error);
+          }
+        }
       }
       
-      // Create user document in Firestore with default role
-      await setDoc(doc(firestore, "users", user.uid), {
-        email: user.email,
-        displayName: user.displayName || "",
-        photoURL: user.photoURL || "",
-        role: "student", // Default role
-        mathLabRole: "", // Empty math lab role - user will choose later
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
-      
-      // Redirect to math lab page
-      router.push("/mathlab");
+      // Redirect to math lab page (handled by useEffect)
     } catch (err) {
       console.error("Google signup error", err);
       if (err.code === "auth/popup-closed-by-user") {

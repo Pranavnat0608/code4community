@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { auth } from "@/firebase";
 import { applyActionCode, checkActionCode, sendEmailVerification } from "firebase/auth";
 import DashboardTopBar from "@/components/DashboardTopBar";
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const [status, setStatus] = useState("verifying"); // verifying, success, error, expired
   const [message, setMessage] = useState("");
   const [isResending, setIsResending] = useState(false);
@@ -265,5 +265,26 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <DashboardTopBar title="BRHS Utilities" showNavLinks={false} />
+        <div className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="max-w-md w-full">
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
+              <h1 className="text-2xl font-bold text-gray-600 mb-4">Loading...</h1>
+              <p className="text-gray-500">Please wait while we load the verification page...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

@@ -1,9 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardTopBar from "@/components/DashboardTopBar";
 
-export default function CheckEmailPage() {
+function CheckEmailContent() {
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState("");
   const [isVerified, setIsVerified] = useState(false);
@@ -112,7 +112,7 @@ export default function CheckEmailPage() {
             {!isVerified ? (
               <>
                 <p className="text-gray-600 mb-6">
-                  We've sent a verification link to:
+                  We&apos;ve sent a verification link to:
                 </p>
 
                 <div className="bg-gray-50 rounded-lg p-3 mb-6">
@@ -131,7 +131,7 @@ export default function CheckEmailPage() {
                   </svg>
                 </div>
                 <p className="text-gray-600 mb-6">
-                  Your email has been verified successfully! You're being redirected to the dashboard.
+                  Your email has been verified successfully! You&apos;re being redirected to the dashboard.
                 </p>
               </>
             )}
@@ -158,7 +158,7 @@ export default function CheckEmailPage() {
 
             {/* Help Text */}
             <div className="mt-6 text-sm text-gray-500">
-              <p>Didn't receive the email? Check your spam folder.</p>
+              <p>Didn&apos;t receive the email? Check your spam folder.</p>
               <p className="mt-1">The verification link will expire in 24 hours.</p>
             </div>
 
@@ -172,5 +172,26 @@ export default function CheckEmailPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <DashboardTopBar title="Check Your Email" showNavLinks={false} />
+        <div className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="max-w-md w-full">
+            <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-6"></div>
+              <h1 className="text-2xl font-bold text-gray-600 mb-4">Loading...</h1>
+              <p className="text-gray-500">Please wait while we load the page...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    }>
+      <CheckEmailContent />
+    </Suspense>
   );
 }

@@ -227,12 +227,14 @@ export default function DashboardTopBar({ title = "StudyHub", onNavigation, show
                     
                     {/* Profile Picture */}
                     {displayUser.photoURL && !imageError ? (
-                      <img
+                      <Image
                         src={displayUser.photoURL.includes('lh3.googleusercontent.com')
                           ? `/api/avatar?u=${encodeURIComponent(displayUser.photoURL)}&sz=96`
                           : displayUser.photoURL
                         }
                         alt="Profile"
+                        width={32}
+                        height={32}
                         className="w-8 h-8 rounded-full border border-border flex-shrink-0"
                         loading="lazy"
                         onLoad={() => {

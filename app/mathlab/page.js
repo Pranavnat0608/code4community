@@ -9,6 +9,7 @@ import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, 
 import { firestore } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance, CacheInvalidation } from "@/utils/cache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
+import Image from "next/image";
 
 export default function MathLabPage() {
   const { user, userData } = useAuth();
@@ -103,9 +104,11 @@ export default function MathLabPage() {
 
     return (
       <div className="relative">
-        <img 
+        <Image 
           src={resolvedSrc} 
           alt={alt}
+          width={96}
+          height={96}
           className={`${className} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-200`}
           loading="lazy"
           onLoad={handleLoad}

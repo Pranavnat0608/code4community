@@ -341,9 +341,11 @@ export default function SignupPage() {
               disabled={loading}
               className="w-full btn-outline flex items-center justify-center gap-3 py-4 text-base"
             >
-              <img
+              <Image
                 src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                 alt="Google logo"
+                width={24}
+                height={24}
                 className="w-6 h-6"
               />
               Continue with Google

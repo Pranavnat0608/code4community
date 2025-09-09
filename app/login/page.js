@@ -323,9 +323,11 @@ export default function LoginPage() {
               </div>
             ) : (
               <>
-                <img
+                <Image
                   src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
                   alt="Google logo"
+                  width={24}
+                  height={24}
                   className="w-6 h-6"
                 />
                 Continue with Google

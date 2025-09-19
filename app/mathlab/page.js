@@ -567,11 +567,9 @@ export default function MathLabPage() {
   };
 
   const handleRoleSelection = async () => {
-    if (!mathLabRole) {
-      alert("Please select a role first!");
-      return;
-    }
-
+    // Automatically set role to 'student' since that's the only option
+    const selectedRole = 'student';
+    
     setIsUpdating(true);
 
     try {
@@ -583,41 +581,7 @@ export default function MathLabPage() {
 
       // Check if user is switching roles
       const currentRole = cachedUser?.mathLabRole;
-      const isSwitchingToTutor = currentRole === 'student' && mathLabRole === 'tutor';
-      const isSwitchingToStudent = currentRole === 'tutor' && mathLabRole === 'student';
-      
-      // If switching to tutor, cancel any active student requests first
-      if (isSwitchingToTutor) {
-        try {
-          // Find and cancel any pending student requests
-          const studentRequestsQuery = query(
-            collection(firestore, "tutoringRequests"),
-            where("studentId", "==", userId),
-            where("status", "in", ["pending", "accepted"])
-          );
-          
-          const studentRequestsSnapshot = await getDocs(studentRequestsQuery);
-          const requestsToCancel = [];
-          
-          studentRequestsSnapshot.forEach((doc) => {
-            requestsToCancel.push(deleteDoc(doc.ref));
-          });
-          
-          if (requestsToCancel.length > 0) {
-            await Promise.all(requestsToCancel);
-            
-            // Clear any local student request state
-            setStudentRequest(null);
-            
-            // Show message to user
-            setRoleChangeMessage(`Switched to tutor role. Cancelled ${requestsToCancel.length} active student request(s).`);
-            setTimeout(() => setRoleChangeMessage(""), 5000);
-          }
-        } catch (cancelError) {
-          console.error("Error cancelling student requests:", cancelError);
-          // Continue with role update even if cancellation fails
-        }
-      }
+      const isSwitchingToStudent = currentRole === 'tutor' && selectedRole === 'student';
       
       // If switching to student, clear any active tutor sessions
       if (isSwitchingToStudent) {
@@ -634,12 +598,12 @@ export default function MathLabPage() {
 
       // Update Firestore
       await updateDoc(doc(firestore, "users", userId), {
-        mathLabRole: mathLabRole,
+        mathLabRole: selectedRole,
         updatedAt: new Date()
       });
 
       // Update local cache using centralized cache manager
-      const updatedUser = { ...cachedUser, mathLabRole };
+      const updatedUser = { ...cachedUser, mathLabRole: selectedRole };
       UserCache.setUserData(updatedUser);
       setCachedUser(updatedUser);
       
@@ -649,7 +613,7 @@ export default function MathLabPage() {
       // Trigger a custom event to force AuthContext refresh
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('userRoleChanged', { 
-          detail: { newRole: mathLabRole, userId } 
+          detail: { newRole: selectedRole, userId } 
         }));
       }
 
@@ -954,128 +918,41 @@ export default function MathLabPage() {
               </p>
             </div>
 
-            {/* Role Selection Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              {/* Student Card */}
-              <div 
-                className={`group relative p-8 rounded-2xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                  mathLabRole === 'student' 
-                    ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' 
-                    : 'border-gray-200 bg-white hover:border-primary/30 hover:shadow-lg'
-                }`}
-                onClick={() => setMathLabRole('student')}
-              >
-                {/* Selection Indicator */}
-                <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 transition-all duration-200 ${
-                  mathLabRole === 'student' 
-                    ? 'border-primary bg-primary' 
-                    : 'border-gray-300 group-hover:border-primary/50'
-                }`}>
-                  {mathLabRole === 'student' && (
-                    <svg className="w-3 h-3 text-white m-auto mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-
+            {/* Student Role Card - Only Option */}
+            <div className="max-w-md mx-auto">
+              <div className="p-8 rounded-2xl border-2 border-primary bg-primary/5 shadow-lg shadow-primary/20">
                 {/* Icon */}
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-6 transition-all duration-200 ${
-                  mathLabRole === 'student' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-600 group-hover:bg-primary/10 group-hover:text-primary'
-                }`}>
+                <div className="w-16 h-16 rounded-xl flex items-center justify-center mb-6 mx-auto bg-primary text-white">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                   </svg>
                 </div>
 
                 {/* Content */}
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">I&apos;m a Student</h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  I want to get help with math, work with tutors, and access learning resources to improve my skills.
+                <h3 className="text-2xl font-bold text-gray-900 mb-3 text-center">Student Access</h3>
+                <p className="text-gray-600 leading-relaxed mb-6 text-center">
+                  Get help with math, work with tutors, and access learning resources to improve your skills.
                 </p>
                 
                 {/* Features */}
-                <ul className="space-y-2 text-sm text-gray-500">
+                <ul className="space-y-3 text-sm text-gray-500">
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     Get matched with qualified tutors
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     Access course-specific resources
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-4 h-4 text-green-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                     Track your progress
-                  </li>
-                </ul>
-              </div>
-
-              {/* Tutor Card */}
-              <div 
-                className={`group relative p-8 rounded-2xl border-2 cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                  mathLabRole === 'tutor' 
-                    ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' 
-                    : 'border-gray-200 bg-white hover:border-primary/30 hover:shadow-lg'
-                }`}
-                onClick={() => setMathLabRole('tutor')}
-              >
-                {/* Selection Indicator */}
-                <div className={`absolute top-4 right-4 w-6 h-6 rounded-full border-2 transition-all duration-200 ${
-                  mathLabRole === 'tutor' 
-                    ? 'border-primary bg-primary' 
-                    : 'border-gray-300 group-hover:border-primary/50'
-                }`}>
-                  {mathLabRole === 'tutor' && (
-                    <svg className="w-3 h-3 text-white m-auto mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  )}
-                </div>
-
-                {/* Icon */}
-                <div className={`w-16 h-16 rounded-xl flex items-center justify-center mb-6 transition-all duration-200 ${
-                  mathLabRole === 'tutor' 
-                    ? 'bg-primary text-white' 
-                    : 'bg-gray-100 text-gray-600 group-hover:bg-primary/10 group-hover:text-primary'
-                }`}>
-                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
-
-                {/* Content */}
-                <h3 className="text-2xl font-bold text-gray-900 mb-3">I&apos;m a Tutor</h3>
-                <p className="text-gray-600 leading-relaxed mb-4">
-                  I want to help students learn math, share my knowledge, and manage tutoring sessions.
-                </p>
-                
-                {/* Features */}
-                <ul className="space-y-2 text-sm text-gray-500">
-                  <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Help students with math concepts
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Manage tutoring sessions
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    Build your tutoring profile
                   </li>
                 </ul>
               </div>
@@ -1085,9 +962,9 @@ export default function MathLabPage() {
             <div className="text-center">
               <button
                 onClick={handleRoleSelection}
-                disabled={isUpdating || !mathLabRole || mathLabRole === displayUser?.mathLabRole}
+                disabled={isUpdating}
                 className={`px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none ${
-                  mathLabRole && mathLabRole !== displayUser?.mathLabRole
+                  !isUpdating
                     ? 'bg-primary text-white shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30' 
                     : 'bg-gray-400 text-gray-600 cursor-not-allowed'
                 }`}

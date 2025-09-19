@@ -97,6 +97,8 @@ service cloud.firestore {
                       request.resource.data.updatedAt is timestamp &&
                       // Only allow role changes by admins or prevent role escalation
                       (isAdmin() || request.resource.data.role == resource.data.role) &&
+                      // Only allow mathLabRole changes by admins or prevent role escalation
+                      (isAdmin() || request.resource.data.mathLabRole == resource.data.mathLabRole) &&
                       // Validate optional fields if present
                       (!('mathLabRole' in request.resource.data) || 
                        (request.resource.data.mathLabRole is string && 

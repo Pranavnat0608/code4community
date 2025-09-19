@@ -101,12 +101,21 @@ export default function SignupPage() {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       const user = result.user;
       
-      // Create user document in Firestore with default role
+      // Check if email is admin email (you can hardcode this later)
+      const adminEmails = [
+        // Add admin emails here when you're ready
+        // "admin@brhs.edu",
+        // "principal@brhs.edu"
+      ];
+      
+      const isAdmin = adminEmails.includes(user.email?.toLowerCase());
+      
+      // Create user document in Firestore with appropriate role
       await setDoc(doc(firestore, "users", user.uid), {
         email: user.email,
         displayName: displayName.trim(),
         photoURL: "",
-        role: "student", // Default role
+        role: isAdmin ? "admin" : "student", // Admin or default student role
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });

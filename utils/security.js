@@ -13,7 +13,10 @@ export const CSP_DIRECTIVES = {
   'frame-src': ["'self'", "https://accounts.google.com"],
   'object-src': ["'none'"],
   'base-uri': ["'self'"],
-  'form-action': ["'self'"]
+  'form-action': ["'self'"],
+  'frame-ancestors': ["'self'"],
+  'upgrade-insecure-requests': [],
+  'block-all-mixed-content': []
 };
 
 /**
@@ -23,6 +26,11 @@ export const CSP_DIRECTIVES = {
  */
 export function generateCSPHeader(directives = CSP_DIRECTIVES) {
   return Object.entries(directives)
-    .map(([key, values]) => `${key} ${values.join(' ')}`)
+    .map(([key, values]) => {
+      if (values.length === 0) {
+        return key; // For directives like 'upgrade-insecure-requests' that don't need values
+      }
+      return `${key} ${values.join(' ')}`;
+    })
     .join('; ');
 }

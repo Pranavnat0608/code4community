@@ -6,6 +6,8 @@ import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
 import { auth, provider, firestore, fetchSignInMethodsForEmail } from "@/firebase";
 import { UserCache, CachePerformance } from "@/utils/cache";
 import { useAuth } from "@/components/AuthContext";
+import { validateEmail, validatePassword, sanitizeInput } from "@/utils/validation";
+import { handleAuthError, logError } from "@/utils/errorHandling";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -60,9 +62,31 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     
+    // Validate inputs
+    const sanitizedEmail = sanitizeInput(email);
+    if (sanitizedEmail !== email) {
+      setError("Email contains invalid characters");
+      setLoading(false);
+      return;
+    }
+
+    const emailError = validateEmail(sanitizedEmail);
+    if (emailError) {
+      setError(emailError);
+      setLoading(false);
+      return;
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setError(passwordError);
+      setLoading(false);
+      return;
+    }
+    
     try {
       console.log('[LoginPage] handleLogin: Attempting signInWithEmailAndPassword');
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
       const user = result.user;
       console.log('[LoginPage] handleLogin: Login successful', {
         uid: user.uid,
@@ -81,67 +105,10 @@ export default function LoginPage() {
       console.log('[LoginPage] handleLogin: Email verified, redirect will be handled by useEffect');
       // Redirect will be handled by useEffect above
     } catch (error) {
-      console.error("[LoginPage] handleLogin: Login error", {
-        code: error.code,
-        message: error.message,
-        email
-      });
+      logError(error, { type: 'login', email: sanitizedEmail });
       
-      if (error.code === "auth/user-not-found") {
-        console.log('[LoginPage] handleLogin: User not found, checking sign-in methods');
-        // Check if email is associated with Google account
-        try {
-          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
-          console.log('[LoginPage] handleLogin: Sign-in methods found', signInMethods);
-          if (signInMethods.includes("google.com")) {
-            setError("No account found with this email and password. Please sign in with Google instead.");
-          } else {
-            setError("No account found with this email. Please sign up first.");
-          }
-        } catch (fetchError) {
-          console.error('[LoginPage] handleLogin: Error fetching sign-in methods', fetchError);
-          setError("No account found with this email. Please sign up first.");
-        }
-      } else if (error.code === "auth/wrong-password") {
-        console.log('[LoginPage] handleLogin: Wrong password, checking sign-in methods');
-        // Check if email is associated with Google account
-        try {
-          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
-          console.log('[LoginPage] handleLogin: Sign-in methods found', signInMethods);
-          if (signInMethods.includes("google.com")) {
-            setError("Incorrect password. This email is associated with a Google account. Please sign in with Google instead.");
-          } else {
-            setError("Incorrect password. Please try again.");
-          }
-        } catch (fetchError) {
-          console.error('[LoginPage] handleLogin: Error fetching sign-in methods', fetchError);
-          setError("Incorrect password. Please try again.");
-        }
-      } else if (error.code === "auth/invalid-email") {
-        console.log('[LoginPage] handleLogin: Invalid email format');
-        setError("Please enter a valid email address.");
-      } else if (error.code === "auth/too-many-requests") {
-        console.log('[LoginPage] handleLogin: Too many requests');
-        setError("Too many failed attempts. Please try again later.");
-      } else if (error.code === "auth/invalid-credential") {
-        console.log('[LoginPage] handleLogin: Invalid credentials, checking sign-in methods');
-        // Check if email is associated with Google account
-        try {
-          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
-          console.log('[LoginPage] handleLogin: Sign-in methods found', signInMethods);
-          if (signInMethods.includes("google.com")) {
-            setError("Invalid credentials. This email is associated with a Google account. Please sign in with Google instead.");
-          } else {
-            setError("Invalid credentials. Please check your email and password.");
-          }
-        } catch (fetchError) {
-          console.error('[LoginPage] handleLogin: Error fetching sign-in methods', fetchError);
-          setError("Invalid credentials. Please check your email and password.");
-        }
-      } else {
-        console.log('[LoginPage] handleLogin: Unknown error', error.code);
-        setError("Login failed. Please check your credentials and try again.");
-      }
+      const errorResponse = handleAuthError(error);
+      setError(errorResponse.error);
     } finally {
       console.log('[LoginPage] handleLogin: Login attempt completed, setting loading to false');
       setLoading(false);

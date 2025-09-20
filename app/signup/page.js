@@ -5,7 +5,7 @@ import { auth, provider, firestore } from "@/firebase";
 import { signInWithPopup, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthContext";
-import { validateEmail, validatePassword, validateConfirmPassword, validateDisplayName } from "@/utils/validation";
+import { validateEmail, validatePassword, validateConfirmPassword, validateDisplayName, sanitizeInput } from "@/utils/validation";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -47,7 +47,12 @@ export default function SignupPage() {
   // Validation functions are imported from utils/validation.js
 
   const validateEmailField = () => {
-    const error = validateEmail(email);
+    const sanitizedEmail = sanitizeInput(email);
+    if (sanitizedEmail !== email) {
+      setEmailError("Email contains invalid characters");
+      return false;
+    }
+    const error = validateEmail(sanitizedEmail);
     setEmailError(error);
     return !error;
   };
@@ -65,7 +70,12 @@ export default function SignupPage() {
   };
 
   const validateDisplayNameField = () => {
-    const error = validateDisplayName(displayName);
+    const sanitizedName = sanitizeInput(displayName);
+    if (sanitizedName !== displayName) {
+      setDisplayNameError("Name contains invalid characters");
+      return false;
+    }
+    const error = validateDisplayName(sanitizedName);
     setDisplayNameError(error);
     return !error;
   };

@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import { auth } from "@/firebase";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { validatePassword, sanitizeInput } from "@/utils/validation";
 import { UserCache, CachePerformance } from "@/utils/cache";
 
 export default function SettingsPage() {
@@ -89,21 +90,28 @@ export default function SettingsPage() {
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     
+    // Sanitize inputs
+    const sanitizedCurrentPassword = sanitizeInput(currentPassword);
+    const sanitizedNewPassword = sanitizeInput(newPassword);
+    const sanitizedConfirmPassword = sanitizeInput(confirmPassword);
+    
     // Validation
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!sanitizedCurrentPassword || !sanitizedNewPassword || !sanitizedConfirmPassword) {
       setPasswordMessage("Please fill in all fields");
       setPasswordSuccess(false);
       return;
     }
     
-    if (newPassword !== confirmPassword) {
+    if (sanitizedNewPassword !== sanitizedConfirmPassword) {
       setPasswordMessage("New passwords do not match");
       setPasswordSuccess(false);
       return;
     }
     
-    if (newPassword.length < 6) {
-      setPasswordMessage("New password must be at least 6 characters long");
+    // Enhanced password validation
+    const passwordError = validatePassword(sanitizedNewPassword);
+    if (passwordError) {
+      setPasswordMessage(passwordError);
       setPasswordSuccess(false);
       return;
     }
@@ -115,12 +123,12 @@ export default function SettingsPage() {
       console.log('[SettingsPage] handlePasswordChange: Starting password change process');
       
       // Re-authenticate user with current password
-      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      const credential = EmailAuthProvider.credential(user.email, sanitizedCurrentPassword);
       await reauthenticateWithCredential(user, credential);
       console.log('[SettingsPage] handlePasswordChange: User re-authenticated successfully');
       
       // Update password
-      await updatePassword(user, newPassword);
+      await updatePassword(user, sanitizedNewPassword);
       console.log('[SettingsPage] handlePasswordChange: Password updated successfully');
       
       // Success

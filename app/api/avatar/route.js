@@ -1,5 +1,35 @@
 export async function GET(request) {
   try {
+    // Rate limiting check
+    const ip = request.headers.get('x-forwarded-for') || 
+               request.headers.get('x-real-ip') || 
+               'unknown';
+    
+    // Basic rate limiting (in production, use Redis)
+    const rateLimitKey = `avatar:${ip}`;
+    const now = Date.now();
+    const windowMs = 60 * 1000; // 1 minute
+    const maxRequests = 30; // 30 requests per minute
+    
+    if (!global.rateLimitStore) {
+      global.rateLimitStore = new Map();
+    }
+    
+    const rateLimitData = global.rateLimitStore.get(rateLimitKey) || [];
+    const validRequests = rateLimitData.filter(timestamp => timestamp > now - windowMs);
+    
+    if (validRequests.length >= maxRequests) {
+      return new Response('Too many requests', { 
+        status: 429,
+        headers: {
+          'Retry-After': '60'
+        }
+      });
+    }
+    
+    validRequests.push(now);
+    global.rateLimitStore.set(rateLimitKey, validRequests);
+
     const { searchParams } = new URL(request.url);
     const urlParam = searchParams.get('u');
     const szParam = searchParams.get('sz');
@@ -57,7 +87,11 @@ export async function GET(request) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800',
-        'Content-Length': contentLength
+        'Content-Length': contentLength,
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-XSS-Protection': '1; mode=block',
+        'Referrer-Policy': 'strict-origin-when-cross-origin'
       }
     });
   } catch (_err) {

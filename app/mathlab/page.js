@@ -9,6 +9,7 @@ import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, 
 import { firestore } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance } from "@/utils/cache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
+import { canAccess, canModify, isTutorOrHigher, ROLES } from "@/utils/authorization";
 import Image from "next/image";
 
 export default function MathLabPage() {
@@ -241,6 +242,9 @@ export default function MathLabPage() {
     }
   }, [user, cachedUser, router]);
 
+  // Check authorization for Math Lab access
+  const isAuthorized = user && userData && canAccess(userData.role, 'mathlab');
+
   // Redirect to email verification if email is not verified
   useEffect(() => {
     if (userData && !isEmailVerified) {
@@ -371,6 +375,13 @@ export default function MathLabPage() {
   const handleMatchMe = async () => {
     if (!selectedCourse) {
       alert("Please select a course first!");
+      return;
+    }
+
+    // Check authorization
+    if (!canModify(userData.role, 'mathlab')) {
+      console.error('Unauthorized: User cannot create math lab requests');
+      alert("You don't have permission to create requests.");
       return;
     }
 
@@ -534,6 +545,13 @@ export default function MathLabPage() {
 
   // Function for tutors to accept requests
   const handleAcceptRequest = async (requestId, studentId, course) => {
+    // Check authorization - only tutors and higher can accept requests
+    if (!isTutorOrHigher(userData.role)) {
+      console.error('Unauthorized: User cannot accept math lab requests');
+      alert("You don't have permission to accept requests.");
+      return;
+    }
+
     try {
       // Find the request details
       const request = pendingRequests.find(req => req.id === requestId);
@@ -643,6 +661,21 @@ export default function MathLabPage() {
   // Don't show loading state - use cached data immediately
   if (!displayUser) {
     return null; // Will redirect to login
+  }
+
+  // Show access denied if not authorized
+  if (user && userData && !isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardTopBar />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>
+            <p className="text-muted-foreground">You don&apos;t have permission to access the Math Lab.</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Show student matching screen if they have a pending request

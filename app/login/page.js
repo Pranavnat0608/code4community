@@ -8,6 +8,7 @@ import { UserCache, CachePerformance } from "@/utils/cache";
 import { useAuth } from "@/components/AuthContext";
 import { validateEmail, validatePassword, sanitizeInput } from "@/utils/validation";
 import { handleAuthError, logError } from "@/utils/errorHandling";
+import { isAdminEmail } from "@/config/admin";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -139,11 +140,15 @@ export default function LoginPage() {
         console.log('[LoginPage] handleGoogleLogin: User does not exist, creating new account');
         // User doesn't exist, create account automatically
         try {
+          // Check if email is admin email
+          const isAdmin = isAdminEmail(user.email);
+          console.log('[LoginPage] handleGoogleLogin: Admin check', { isAdmin, email: user.email });
+          
           const userData = {
             email: user.email,
             displayName: user.displayName || "",
             photoURL: user.photoURL || "",
-            role: "student", // Default role
+            role: isAdmin ? "admin" : "student", // Admin or default student role
             mathLabRole: "", // Empty math lab role - user will choose later
             createdAt: new Date(),
             updatedAt: new Date()
@@ -175,6 +180,25 @@ export default function LoginPage() {
         console.log('[LoginPage] handleGoogleLogin: User exists, syncing data');
         // Sync photoURL from Firebase Auth with Firestore
         const userData = userDoc.data();
+        
+        // Check if user should be admin and update role if needed
+        const isAdmin = isAdminEmail(user.email);
+        const needsRoleUpdate = isAdmin && userData.role !== 'admin';
+        
+        if (needsRoleUpdate) {
+          console.log('[LoginPage] handleGoogleLogin: Updating user role to admin');
+          try {
+            await updateDoc(doc(firestore, "users", user.uid), {
+              role: 'admin',
+              updatedAt: new Date()
+            });
+            userData.role = 'admin'; // Update local data
+            console.log('[LoginPage] handleGoogleLogin: Role updated to admin successfully');
+          } catch (error) {
+            console.error("[LoginPage] handleGoogleLogin: Error updating role", error);
+          }
+        }
+        
         if (user.photoURL && userData.photoURL !== user.photoURL) {
           console.log('[LoginPage] handleGoogleLogin: Updating photoURL in Firestore');
           try {

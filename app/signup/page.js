@@ -6,6 +6,7 @@ import { signInWithPopup, createUserWithEmailAndPassword, sendEmailVerification 
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthContext";
 import { validateEmail, validatePassword, validateConfirmPassword, validateDisplayName, sanitizeInput } from "@/utils/validation";
+import { isAdminEmail } from "@/config/admin";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -115,14 +116,8 @@ export default function SignupPage() {
         emailVerified: user.emailVerified
       });
       
-      // Check if email is admin email (you can hardcode this later)
-      const adminEmails = [
-        // Add admin emails here when you're ready
-        // "admin@brhs.edu",
-        // "principal@brhs.edu"
-      ];
-      
-      const isAdmin = adminEmails.includes(user.email?.toLowerCase());
+      // Check if email is admin email
+      const isAdmin = isAdminEmail(user.email);
       console.log('[SignupPage] handleEmailSignup: Admin check', { isAdmin, email: user.email });
       
       // Create user document in Firestore with appropriate role

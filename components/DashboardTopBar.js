@@ -100,7 +100,7 @@ export default function DashboardTopBar({ title = "BRHS Utilities", onNavigation
 
   return (
     <>
-      <header className="bg-background border-b border-border px-6 py-4 mb-6">
+      <header className="bg-background border-b border-border px-6 py-4 mb-6 relative z-40">
         <div className="container">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-8">

@@ -3,6 +3,7 @@ import { useAuth } from "../../components/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
+import MathLabSidebar from "../../components/MathLabSidebar";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { AppCardSkeleton, RequestCardSkeleton } from "../../components/SkeletonLoader";
 import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, deleteDoc } from "firebase/firestore";
@@ -28,6 +29,8 @@ export default function MathLabPage() {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [studentRequest, setStudentRequest] = useState(null);
   const [roleChangeMessage, setRoleChangeMessage] = useState("");
+  const [sessionStatus, setSessionStatus] = useState(null); // 'accepted', 'started', 'ended'
+  const [sessionEndData, setSessionEndData] = useState(null); // Data for session over screen
 
   // Available courses - memoized for performance
   const courses = useMemo(() => [
@@ -243,7 +246,7 @@ export default function MathLabPage() {
   }, [user, cachedUser, router]);
 
   // Check authorization for Math Lab access
-  const isAuthorized = user && userData && canAccess(userData.role, 'mathlab');
+  const isAuthorized = user && userData && canAccess(userData.role, 'mathlab', userData.mathLabRole);
 
   // Redirect to email verification if email is not verified
   useEffect(() => {
@@ -298,7 +301,11 @@ export default function MathLabPage() {
   // Session timer effect
   useEffect(() => {
     let interval;
-    if (activeSession && sessionStartTime) {
+    // Check if session is active for either tutors or students
+    const isSessionActive = (activeSession && sessionStartTime) || 
+                           (studentRequest && sessionStatus === 'started' && sessionStartTime);
+    
+    if (isSessionActive) {
       interval = setInterval(() => {
         const now = new Date();
         const duration = Math.floor((now - sessionStartTime) / 1000);
@@ -308,7 +315,7 @@ export default function MathLabPage() {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [activeSession, sessionStartTime]);
+  }, [activeSession, sessionStartTime, studentRequest, sessionStatus]);
 
   // Check for student requests
   useEffect(() => {
@@ -334,13 +341,28 @@ export default function MathLabPage() {
                 });
               } else if (match && match.status === 'accepted') {
                 // Student has been matched with a tutor
+                const sessionStartedAt = match.sessionStartedAt?.toDate ? match.sessionStartedAt.toDate() : (match.sessionStartedAt ? new Date(match.sessionStartedAt) : null);
+                
                 setStudentRequest({
                   id: match.id,
                   course: match.course,
                   status: match.status,
                   tutorName: match.tutorName,
-                  acceptedAt: match.acceptedAt?.toDate ? match.acceptedAt.toDate() : new Date()
+                  acceptedAt: match.acceptedAt?.toDate ? match.acceptedAt.toDate() : new Date(),
+                  sessionStartedAt: sessionStartedAt
                 });
+                
+                // Check if session has started
+                if (sessionStartedAt) {
+                  setSessionStatus('started');
+                  setSessionStartTime(sessionStartedAt);
+                  // Calculate current session duration
+                  const now = new Date();
+                  const duration = Math.floor((now - sessionStartedAt) / 1000);
+                  setSessionDuration(duration);
+                } else {
+                  setSessionStatus('accepted');
+                }
               }
             } else {
               setStudentRequest(null);
@@ -379,7 +401,7 @@ export default function MathLabPage() {
     }
 
     // Check authorization
-    if (!canModify(userData.role, 'mathlab')) {
+    if (!canModify(userData.role, 'mathlab', userData.mathLabRole)) {
       console.error('Unauthorized: User cannot create math lab requests');
       alert("You don't have permission to create requests.");
       return;
@@ -521,19 +543,55 @@ export default function MathLabPage() {
     }
   };
 
-  // Function to end tutoring session - now deletes the request after completion
+  // Function to end tutoring session - now saves completed session and deletes the request
   const handleEndSession = async () => {
     if (!activeSession) return;
     
     try {
-      // Delete the request from the database after session completion
+      const endTime = new Date();
+      const sessionDuration = Math.floor((endTime - sessionStartTime) / 1000);
+      
+      // Save completed session to history
+      const completedSessionData = {
+        studentId: activeSession.studentId || user?.uid || cachedUser?.uid,
+        studentName: activeSession.studentName,
+        studentEmail: activeSession.studentEmail,
+        tutorId: user?.uid || cachedUser?.uid,
+        tutorName: (displayUser?.displayName && displayUser.displayName.trim())
+          || ([displayUser?.firstName, displayUser?.lastName].filter(Boolean).join(' ').trim())
+          || user?.email
+          || 'Anonymous Tutor',
+        tutorEmail: user?.email || cachedUser?.email,
+        course: activeSession.course,
+        startTime: sessionStartTime,
+        endTime: endTime,
+        duration: sessionDuration,
+        completedAt: endTime,
+        status: 'completed'
+      };
+
+      // Add to completed sessions collection
+      await addDoc(collection(firestore, "completedSessions"), completedSessionData);
+      
+      // Delete the original request from the database
       await deleteDoc(doc(firestore, "tutoringRequests", activeSession.requestId));
       
-      // Clear cache to reflect the deletion
+      // Clear cache to reflect the changes
       MathLabCache.clearAll();
       invalidateOnDataChange('tutoring_session', 'ended');
 
-      // Clear session state
+      // Set session end data for session over screen
+      setSessionEndData({
+        studentName: activeSession.studentName,
+        studentEmail: activeSession.studentEmail,
+        course: activeSession.course,
+        startTime: sessionStartTime,
+        endTime: endTime,
+        duration: sessionDuration
+      });
+      setSessionStatus('ended');
+      
+      // Clear active session but keep end data for display
       setActiveSession(null);
       setSessionStartTime(null);
       setSessionDuration(0);
@@ -546,7 +604,7 @@ export default function MathLabPage() {
   // Function for tutors to accept requests
   const handleAcceptRequest = async (requestId, studentId, course) => {
     // Check authorization - only tutors and higher can accept requests
-    if (!isTutorOrHigher(userData.role)) {
+    if (!isTutorOrHigher(userData.role, userData.mathLabRole)) {
       console.error('Unauthorized: User cannot accept math lab requests');
       alert("You don't have permission to accept requests.");
       return;
@@ -572,22 +630,47 @@ export default function MathLabPage() {
         updatedAt: new Date()
       });
 
-      // Start the tutoring session
+      // Set active session for tutor (but not started yet)
       setActiveSession({
         requestId,
         studentName: request.studentName,
         studentEmail: request.studentEmail,
-        course: request.course,
-        startTime: new Date()
+        course: request.course
       });
-      setSessionStartTime(new Date());
-      setSessionDuration(0);
+      setSessionStatus('accepted');
 
       // TODO: Send notification to student (could be email, push notification, etc.)
     } catch (error) {
       console.error("Error accepting request:", error);
       alert("Failed to accept request. Please try again.");
     }
+  };
+
+  // Function to start the tutoring session
+  const handleStartSession = async () => {
+    if (!activeSession) return;
+    
+    try {
+      const startTime = new Date();
+      setSessionStartTime(startTime);
+      setSessionDuration(0);
+      setSessionStatus('started');
+      
+      // Update the request document to indicate session has started
+      await updateDoc(doc(firestore, "tutoringRequests", activeSession.requestId), {
+        sessionStartedAt: startTime,
+        updatedAt: new Date()
+      });
+    } catch (error) {
+      console.error("Error starting session:", error);
+      alert("Failed to start session. Please try again.");
+    }
+  };
+
+  // Function to dismiss session over screen
+  const handleDismissSession = () => {
+    setSessionEndData(null);
+    setSessionStatus(null);
   };
 
   const handleRoleSelection = useCallback(async () => {
@@ -680,14 +763,97 @@ export default function MathLabPage() {
 
   // Show student matching screen if they have a pending request
   if (studentRequest && displayUser?.mathLabRole === 'student') {
+    // If session is started, show the same detailed screen as tutor
+    if (sessionStatus === 'started') {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+          <DashboardTopBar 
+            title="BRHS Math Lab" 
+            showNavLinks={false}
+          />
+          <MathLabSidebar />
+
+          <div className="flex-1 flex items-center justify-center px-4 py-12 ml-0 md:ml-16 pb-16 md:pb-12">
+            <div className="max-w-4xl w-full">
+              {/* Session Header */}
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center justify-center w-24 h-24 bg-primary/10 rounded-full mb-6">
+                  <svg className="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
+                </div>
+                
+                <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                  Tutoring Session Active
+                </h1>
+                
+                <p className="text-xl text-gray-600 max-w-lg mx-auto leading-relaxed">
+                  You are currently being tutored by {studentRequest.tutorName} in {studentRequest.course}
+                </p>
+              </div>
+
+              {/* Session Info Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* Tutor Info */}
+                <div className="bg-white rounded-2xl border-2 border-primary/20 p-6 text-center">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Tutor</h3>
+                  <p className="text-primary font-medium">{studentRequest.tutorName}</p>
+                </div>
+
+                {/* Course Info */}
+                <div className="bg-white rounded-2xl border-2 border-primary/20 p-6 text-center">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Course</h3>
+                  <p className="text-primary font-medium">{studentRequest.course}</p>
+                  <p className="text-sm text-gray-500 mt-1">Math Lab Session</p>
+                </div>
+
+                {/* Session Timer */}
+                <div className="bg-white rounded-2xl border-2 border-primary/20 p-6 text-center">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Session Duration</h3>
+                  <div className="text-3xl font-mono font-bold text-primary">
+                    {formatTime(sessionDuration)}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">Live Timer</p>
+                </div>
+              </div>
+
+              {/* Session Info */}
+              <div className="text-center">
+                <p className="text-sm text-gray-500">
+                  Session started at {sessionStartTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // For pending or accepted but not started states, show the original matching screen
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         <DashboardTopBar 
           title="BRHS Math Lab" 
           showNavLinks={false}
         />
+        <MathLabSidebar />
 
-        <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="flex-1 flex items-center justify-center px-4 py-12 ml-0 md:ml-16 pb-16 md:pb-12">
           <div className="max-w-2xl w-full">
             {/* Matching Header */}
             <div className="text-center mb-12">
@@ -784,9 +950,14 @@ export default function MathLabPage() {
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">Status</h3>
                   <p className={`font-medium ${
-                    studentRequest.status === 'pending' ? 'text-yellow-600' : 'text-green-600'
+                    studentRequest.status === 'pending' 
+                      ? 'text-yellow-600' 
+                      : 'text-green-600'
                   }`}>
-                    {studentRequest.status === 'pending' ? 'Searching...' : 'Matched!'}
+                    {studentRequest.status === 'pending' 
+                      ? 'Searching...' 
+                      : 'Matched!'
+                    }
                   </p>
                 </div>
               </div>
@@ -843,16 +1014,123 @@ export default function MathLabPage() {
     );
   }
 
-  // Show tutoring session if active
-  if (activeSession && displayUser?.mathLabRole === 'tutor') {
+  // Show session over screen if session just ended
+  if (sessionStatus === 'ended' && sessionEndData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
         <DashboardTopBar 
-          title="BRHS Math Lab - Active Session" 
+          title="BRHS Math Lab" 
           showNavLinks={false}
         />
+        <MathLabSidebar />
 
-        <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="flex-1 flex items-center justify-center px-4 py-12 ml-0 md:ml-16 pb-16 md:pb-12">
+          <div className="max-w-2xl w-full">
+            {/* Session Over Header */}
+            <div className="text-center mb-8">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              
+              <h1 className="text-4xl font-bold text-gray-900 mb-4">
+                Session Complete!
+              </h1>
+              
+              <p className="text-xl text-gray-600 max-w-lg mx-auto leading-relaxed">
+                Your tutoring session with {sessionEndData.studentName} has ended successfully.
+              </p>
+            </div>
+
+            {/* Session Summary */}
+            <div className="bg-white rounded-2xl shadow-xl p-8 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Student Info */}
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Student</h3>
+                  <p className="text-primary font-medium">{sessionEndData.studentName}</p>
+                  <p className="text-sm text-gray-500 mt-1">{sessionEndData.studentEmail}</p>
+                </div>
+
+                {/* Course Info */}
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Course</h3>
+                  <p className="text-primary font-medium">{sessionEndData.course}</p>
+                </div>
+
+                {/* Duration Info */}
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Duration</h3>
+                  <p className="text-primary font-medium">
+                    {Math.floor(sessionEndData.duration / 60)}:{(sessionEndData.duration % 60).toString().padStart(2, '0')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Session Times */}
+              <div className="mt-6 pt-6 border-t border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
+                  <div>
+                    <p className="text-sm text-gray-500">Started</p>
+                    <p className="font-medium">{sessionEndData.startTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Ended</p>
+                    <p className="font-medium">{sessionEndData.endTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Dismiss Button */}
+            <div className="text-center">
+              <button
+                onClick={handleDismissSession}
+                className="px-8 py-4 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+              >
+                <div className="flex items-center justify-center">
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Dismiss
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show tutoring session if active
+  if (activeSession && displayUser?.mathLabRole === 'tutor') {
+    const isSessionStarted = sessionStatus === 'started';
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <DashboardTopBar 
+          title="BRHS Math Lab" 
+          showNavLinks={false}
+        />
+        <MathLabSidebar />
+
+        <div className="flex-1 flex items-center justify-center px-4 py-12 ml-0 md:ml-16 pb-16 md:pb-12">
           <div className="max-w-4xl w-full">
             {/* Session Header */}
             <div className="text-center mb-12">
@@ -863,11 +1141,14 @@ export default function MathLabPage() {
               </div>
               
               <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                Tutoring Session Active
+                {isSessionStarted ? 'Tutoring Session Active' : 'Session Ready to Start'}
               </h1>
               
               <p className="text-xl text-gray-600 max-w-lg mx-auto leading-relaxed">
-                You are currently tutoring {activeSession.studentName} in {activeSession.course}
+                {isSessionStarted 
+                  ? `You are currently tutoring ${activeSession.studentName} in ${activeSession.course}`
+                  : `You have accepted ${activeSession.studentName}'s request for ${activeSession.course}. Ready to begin?`
+                }
               </p>
             </div>
 
@@ -897,38 +1178,73 @@ export default function MathLabPage() {
                 <p className="text-sm text-gray-500 mt-1">Math Lab Session</p>
               </div>
 
-              {/* Session Timer */}
+              {/* Session Timer or Status */}
               <div className="bg-white rounded-2xl border-2 border-primary/20 p-6 text-center">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Session Duration</h3>
-                <div className="text-3xl font-mono font-bold text-primary">
-                  {formatTime(sessionDuration)}
-                </div>
-                <p className="text-sm text-gray-500 mt-1">Live Timer</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  {isSessionStarted ? 'Session Duration' : 'Status'}
+                </h3>
+                {isSessionStarted ? (
+                  <>
+                    <div className="text-3xl font-mono font-bold text-primary">
+                      {formatTime(sessionDuration)}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">Live Timer</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      Ready
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">Waiting to start</p>
+                  </>
+                )}
               </div>
             </div>
 
             {/* Session Actions */}
             <div className="text-center">
-              <button
-                onClick={handleEndSession}
-                className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30"
-              >
-                <div className="flex items-center justify-center">
-                  <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  End Session
-                </div>
-              </button>
-              
-              <p className="text-sm text-gray-500 mt-4">
-                Session started at {activeSession.startTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
-              </p>
+              {isSessionStarted ? (
+                <>
+                  <button
+                    onClick={handleEndSession}
+                    className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg shadow-red-500/25 hover:shadow-xl hover:shadow-red-500/30"
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      End Session
+                    </div>
+                  </button>
+                  
+                  <p className="text-sm text-gray-500 mt-4">
+                    Session started at {sessionStartTime?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) || 'Unknown time'}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleStartSession}
+                    className="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/30"
+                  >
+                    <div className="flex items-center justify-center">
+                      <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Start Session
+                    </div>
+                  </button>
+                  
+                  <p className="text-sm text-gray-500 mt-4">
+                    Click "Start Session" when you're ready to begin tutoring
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -937,12 +1253,13 @@ export default function MathLabPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
       {/* Use the reusable DashboardTopBar component */}
       <DashboardTopBar 
         title="BRHS Math Lab" 
         showNavLinks={false} // Don't show navigation links on math lab page
       />
+      <MathLabSidebar />
 
       {/* Role Change Message */}
       {roleChangeMessage && (
@@ -961,7 +1278,7 @@ export default function MathLabPage() {
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div className="flex-1 flex items-center justify-center ml-0 md:ml-16 pb-16 md:pb-0" style={{ minHeight: 'calc(100vh - 80px)' }}>
         {displayUser.mathLabRole === 'tutor' ? (
           // Tutor Dashboard - Redesigned with Horizontal Grid
           <div className="max-w-7xl w-full mx-4">

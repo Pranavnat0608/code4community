@@ -43,7 +43,7 @@ export const validatePassword = (password) => {
   if (!/(?=.*[a-z])/.test(password)) return "Password must contain at least one lowercase letter";
   if (!/(?=.*[A-Z])/.test(password)) return "Password must contain at least one uppercase letter";
   if (!/(?=.*\d)/.test(password)) return "Password must contain at least one number";
-  if (!/(?=.*[@$!%*?&])/.test(password)) return "Password must contain at least one special character (@$!%*?&)";
+  if (!/(?=.*[@$!%*?&#^+=_\-~`|\\/])/.test(password)) return "Password must contain at least one special character (@$!%*?&#^+=_-~`|\\/)";
   
   // Check for common weak passwords
   const commonPasswords = ['password', '123456', 'qwerty', 'abc123', 'password123'];

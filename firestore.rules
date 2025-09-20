@@ -42,6 +42,15 @@ service cloud.firestore {
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
+    function isAdminByEmail() {
+      return isAuthenticated() && 
+             request.auth.token.email == '1021676@lcps.org'; // Hardcoded admin email
+    }
+    
+    function isAdminUser() {
+      return isAdmin() || isAdminByEmail();
+    }
+    
     function isTeacher() {
       return isAuthenticated() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -80,32 +89,50 @@ service cloud.firestore {
                       // Prevent role escalation during signup
                       request.resource.data.role == 'student';
       
-      // Allow update: Only own document with restrictions
+      // Allow update: Only own document with restrictions, or admin updates
       allow update: if isAuthenticated() && 
-                      isOwner(userId) &&
-                      isEmailVerified() &&
-                      // Prevent changing critical fields
-                      request.resource.data.email == resource.data.email &&
-                      request.resource.data.uid == resource.data.uid &&
-                      request.resource.data.createdAt == resource.data.createdAt &&
-                      // Validate updated fields
-                      request.resource.data.displayName is string &&
-                      request.resource.data.displayName.size() > 0 &&
-                      request.resource.data.displayName.size() <= 100 &&
-                      request.resource.data.role is string &&
-                      isValidRole(request.resource.data.role) &&
-                      request.resource.data.updatedAt is timestamp &&
-                      // Only allow role changes by admins or prevent role escalation
-                      (isAdmin() || request.resource.data.role == resource.data.role) &&
-                      // Only allow mathLabRole changes by admins or prevent role escalation
-                      (isAdmin() || request.resource.data.mathLabRole == resource.data.mathLabRole) &&
-                      // Validate optional fields if present
-                      (!('mathLabRole' in request.resource.data) || 
-                       (request.resource.data.mathLabRole is string && 
-                        isValidMathLabRole(request.resource.data.mathLabRole))) &&
-                      (!('photoURL' in request.resource.data) || 
-                       (request.resource.data.photoURL is string && 
-                        request.resource.data.photoURL.size() <= 500));
+                      isEmailVerified() && (
+                        // Own document updates
+                        (isOwner(userId) &&
+                         // Prevent changing critical fields
+                         request.resource.data.email == resource.data.email &&
+                         request.resource.data.uid == resource.data.uid &&
+                         request.resource.data.createdAt == resource.data.createdAt &&
+                         // Validate updated fields
+                         request.resource.data.displayName is string &&
+                         request.resource.data.displayName.size() > 0 &&
+                         request.resource.data.displayName.size() <= 100 &&
+                         request.resource.data.role is string &&
+                         isValidRole(request.resource.data.role) &&
+                         request.resource.data.updatedAt is timestamp &&
+                         // Only allow role changes by admins or prevent role escalation
+                         (isAdminUser() || request.resource.data.role == resource.data.role) &&
+                         // Only allow mathLabRole changes by admins or prevent role escalation
+                         (isAdminUser() || request.resource.data.mathLabRole == resource.data.mathLabRole) &&
+                         // Validate optional fields if present
+                         (!('mathLabRole' in request.resource.data) || 
+                          (request.resource.data.mathLabRole is string && 
+                           isValidMathLabRole(request.resource.data.mathLabRole))) &&
+                         (!('photoURL' in request.resource.data) || 
+                          (request.resource.data.photoURL is string && 
+                           request.resource.data.photoURL.size() <= 500))) ||
+                        // Admin updates (can modify any user)
+                        (isAdminUser() &&
+                         // Validate updated fields
+                         request.resource.data.displayName is string &&
+                         request.resource.data.displayName.size() > 0 &&
+                         request.resource.data.displayName.size() <= 100 &&
+                         request.resource.data.role is string &&
+                         isValidRole(request.resource.data.role) &&
+                         request.resource.data.updatedAt is timestamp &&
+                         // Validate optional fields if present
+                         (!('mathLabRole' in request.resource.data) || 
+                          (request.resource.data.mathLabRole is string && 
+                           isValidMathLabRole(request.resource.data.mathLabRole))) &&
+                         (!('photoURL' in request.resource.data) || 
+                          (request.resource.data.photoURL is string && 
+                           request.resource.data.photoURL.size() <= 500)))
+                      );
       
       // Allow delete: Only admins can delete users
       allow delete: if isAdmin();
@@ -203,6 +230,59 @@ service cloud.firestore {
                         (isTeacher() && resource.data.status == 'pending') ||
                         isAdmin()
                       );
+    }
+    
+    // CompletedSessions collection - Contains completed tutoring session history
+    match /completedSessions/{sessionId} {
+      // Allow read: Users can read sessions they participated in
+      allow read: if isAuthenticated() && 
+                    isEmailVerified() && (
+                      // Students can read sessions they participated in
+                      (isStudent() && resource.data.studentId == request.auth.uid) ||
+                      // Teachers can read sessions they tutored
+                      (isTeacher() && resource.data.tutorId == request.auth.uid) ||
+                      // Admins can read all sessions
+                      isAdminUser()
+                    );
+      
+      // Allow create: Only teachers can create completed sessions (when ending a session)
+      allow create: if isAuthenticated() && 
+                      isEmailVerified() && 
+                      isTeacher() &&
+                      // Validate required fields
+                      request.resource.data.keys().hasAll(['studentId', 'studentName', 'tutorId', 'tutorName', 'course', 'startTime', 'endTime', 'duration', 'completedAt', 'status']) &&
+                      // Validate field types and values
+                      request.resource.data.studentId is string &&
+                      request.resource.data.studentName is string &&
+                      request.resource.data.studentName.size() > 0 &&
+                      request.resource.data.studentName.size() <= 100 &&
+                      request.resource.data.tutorId is string &&
+                      request.resource.data.tutorId == request.auth.uid &&
+                      request.resource.data.tutorName is string &&
+                      request.resource.data.tutorName.size() > 0 &&
+                      request.resource.data.tutorName.size() <= 100 &&
+                      request.resource.data.course is string &&
+                      isValidCourse(request.resource.data.course) &&
+                      request.resource.data.startTime is timestamp &&
+                      request.resource.data.endTime is timestamp &&
+                      request.resource.data.duration is number &&
+                      request.resource.data.duration > 0 &&
+                      request.resource.data.completedAt is timestamp &&
+                      request.resource.data.status is string &&
+                      request.resource.data.status == 'completed' &&
+                      // Validate optional fields if present
+                      (!('studentEmail' in request.resource.data) || 
+                       (request.resource.data.studentEmail is string && 
+                        isValidEmail(request.resource.data.studentEmail))) &&
+                      (!('tutorEmail' in request.resource.data) || 
+                       (request.resource.data.tutorEmail is string && 
+                        isValidEmail(request.resource.data.tutorEmail)));
+      
+      // Allow update: Only admins can update completed sessions
+      allow update: if isAdmin();
+      
+      // Allow delete: Only admins can delete completed sessions
+      allow delete: if isAdmin();
     }
     
     // Deny all other collections and documents

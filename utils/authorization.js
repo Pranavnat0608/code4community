@@ -1,4 +1,5 @@
 // Authorization utility functions
+import { isAdminEmail } from '@/config/admin';
 
 // User roles
 export const ROLES = {
@@ -59,13 +60,33 @@ export const hasPermission = (userRole, resource, permission) => {
 };
 
 // Check if user can access a resource
-export const canAccess = (userRole, resource) => {
-  return hasPermission(userRole, resource, PERMISSIONS.READ);
+export const canAccess = (userRole, resource, mathLabRole = null) => {
+  // Check main role first
+  if (hasPermission(userRole, resource, PERMISSIONS.READ)) {
+    return true;
+  }
+  
+  // For mathlab resource, also check if user has tutor mathLabRole
+  if (resource === 'mathlab' && mathLabRole === 'tutor') {
+    return true;
+  }
+  
+  return false;
 };
 
 // Check if user can modify a resource
-export const canModify = (userRole, resource) => {
-  return hasPermission(userRole, resource, PERMISSIONS.WRITE);
+export const canModify = (userRole, resource, mathLabRole = null) => {
+  // Check main role first
+  if (hasPermission(userRole, resource, PERMISSIONS.WRITE)) {
+    return true;
+  }
+  
+  // For mathlab resource, also check if user has tutor mathLabRole
+  if (resource === 'mathlab' && mathLabRole === 'tutor') {
+    return true;
+  }
+  
+  return false;
 };
 
 // Check if user can manage a resource
@@ -78,14 +99,34 @@ export const isAdmin = (userRole) => {
   return userRole === ROLES.ADMIN;
 };
 
+// Check if user is admin by email (for hardcoded admin)
+export const isAdminByEmail = (email) => {
+  return isAdminEmail(email);
+};
+
+// Check if user is admin by role or email
+export const isAdminUser = (userRole, email) => {
+  return isAdmin(userRole) || isAdminByEmail(email);
+};
+
 // Check if user is teacher or admin
 export const isTeacherOrAdmin = (userRole) => {
   return userRole === ROLES.TEACHER || userRole === ROLES.ADMIN;
 };
 
 // Check if user is tutor or higher
-export const isTutorOrHigher = (userRole) => {
-  return [ROLES.TUTOR, ROLES.TEACHER, ROLES.ADMIN].includes(userRole);
+export const isTutorOrHigher = (userRole, mathLabRole = null) => {
+  // Check main role first
+  if ([ROLES.TUTOR, ROLES.TEACHER, ROLES.ADMIN].includes(userRole)) {
+    return true;
+  }
+  
+  // Also check mathLabRole if provided
+  if (mathLabRole === 'tutor') {
+    return true;
+  }
+  
+  return false;
 };
 
 // Validate user action

@@ -8,6 +8,10 @@ service cloud.firestore {
       return request.auth != null;
     }
     
+    function isAppCheckValid() {
+      return request.app_check_token != null;
+    }
+    
     function isEmailVerified() {
       return request.auth.token.email_verified == true;
     }
@@ -37,13 +41,13 @@ service cloud.firestore {
     }
     
     function isAdmin() {
-      return isAuthenticated() && 
+      return isAuthenticated() && isAppCheckValid() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
     
     function isAdminByEmail() {
-      return isAuthenticated() && 
+      return isAuthenticated() && isAppCheckValid() && 
              request.auth.token.email == '1021676@lcps.org'; // Hardcoded admin email
     }
     
@@ -52,13 +56,13 @@ service cloud.firestore {
     }
     
     function isTeacher() {
-      return isAuthenticated() && 
+      return isAuthenticated() && isAppCheckValid() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
     
     function isStudent() {
-      return isAuthenticated() && 
+      return isAuthenticated() && isAppCheckValid() && 
              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['student', 'teacher', 'admin'];
     }
@@ -66,10 +70,10 @@ service cloud.firestore {
     // Users collection - Contains user profile data
     match /users/{userId} {
       // Allow read access to own user document
-      allow read: if isAuthenticated() && isOwner(userId);
+      allow read: if isAuthenticated() && isAppCheckValid() && isAppCheckValid() && isOwner(userId);
       
       // Allow create: Only during signup process
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() && isAppCheckValid() && 
                       isOwner(userId) &&
                       isEmailVerified() &&
                       // Validate required fields
@@ -90,7 +94,7 @@ service cloud.firestore {
                       request.resource.data.role == 'student';
       
       // Allow update: Only own document with restrictions, or admin updates
-      allow update: if isAuthenticated() && 
+      allow update: if isAuthenticated() && isAppCheckValid() && 
                       isEmailVerified() && (
                         // Own document updates
                         (isOwner(userId) &&
@@ -141,7 +145,7 @@ service cloud.firestore {
     // TutoringRequests collection - Contains math lab tutoring requests
     match /tutoringRequests/{requestId} {
       // Allow read: Students can read their own requests, tutors can read pending requests
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() && isAppCheckValid() && 
                     isEmailVerified() && (
                       // Students can read their own requests
                       (isStudent() && resource.data.studentId == request.auth.uid) ||
@@ -152,7 +156,7 @@ service cloud.firestore {
                     );
       
       // Allow create: Only students can create requests
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() && isAppCheckValid() && 
                       isEmailVerified() && 
                       isStudent() &&
                       // Validate required fields
@@ -185,7 +189,7 @@ service cloud.firestore {
                        (request.resource.data.completedAt is timestamp));
       
       // Allow update: Students can update their own pending requests, tutors can accept/complete
-      allow update: if isAuthenticated() && 
+      allow update: if isAuthenticated() && isAppCheckValid() && 
                       isEmailVerified() && (
                         // Students can only update their own pending requests
                         (isStudent() && 
@@ -221,7 +225,7 @@ service cloud.firestore {
       
       // Allow delete: Students can delete their own pending requests, admins can delete any,
       // and teachers can delete old pending requests (for cleanup)
-      allow delete: if isAuthenticated() && 
+      allow delete: if isAuthenticated() && isAppCheckValid() && 
                       isEmailVerified() && (
                         (isStudent() && 
                          resource.data.studentId == request.auth.uid && 
@@ -235,7 +239,7 @@ service cloud.firestore {
     // CompletedSessions collection - Contains completed tutoring session history
     match /completedSessions/{sessionId} {
       // Allow read: Users can read sessions they participated in
-      allow read: if isAuthenticated() && 
+      allow read: if isAuthenticated() && isAppCheckValid() && 
                     isEmailVerified() && (
                       // Students can read sessions they participated in
                       (isStudent() && resource.data.studentId == request.auth.uid) ||
@@ -246,7 +250,7 @@ service cloud.firestore {
                     );
       
       // Allow create: Only teachers can create completed sessions (when ending a session)
-      allow create: if isAuthenticated() && 
+      allow create: if isAuthenticated() && isAppCheckValid() && 
                       isEmailVerified() && 
                       isTeacher() &&
                       // Validate required fields

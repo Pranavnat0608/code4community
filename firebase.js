@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { initializeAppCheckConfig } from "./config/firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyANRvFxmAayPX_4EERpCFIOFNZJTzFG1eE",
@@ -14,6 +15,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+
+// Initialize App Check for production security
+const appCheck = initializeAppCheckConfig(app);
 
 // Configure Google provider for better OAuth experience
 provider.setCustomParameters({

@@ -1,7 +1,8 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { initializeAppCheckConfig } from "./config/firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { recaptchaSiteKey } from "./keys.js";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyANRvFxmAayPX_4EERpCFIOFNZJTzFG1eE",
@@ -17,7 +18,12 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 // Initialize App Check for production security
-const appCheck = initializeAppCheckConfig(app);
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 // Configure Google provider for better OAuth experience
 provider.setCustomParameters({

@@ -18,13 +18,12 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 // Initialize App Check for production security
-// Temporarily disabled until app is registered in Firebase Console
-// if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-//   initializeAppCheck(app, {
-//     provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-//     isTokenAutoRefreshEnabled: true
-//   });
-// }
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
+}
 
 // Configure Google provider for better OAuth experience
 provider.setCustomParameters({

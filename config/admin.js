@@ -1,11 +1,13 @@
 /**
  * Admin Configuration
- * Hardcoded admin email for tutor management
+ * Admin email for tutor management
  */
 
+import { adminEmail } from '../keys.js';
+
 export const ADMIN_CONFIG = {
-  // Admin email from environment variable or fallback
-  ADMIN_EMAIL: process.env.ADMIN_EMAIL || '1021676@lcps.org',
+  // Admin email from keys.js
+  ADMIN_EMAIL: adminEmail,
   
   // Admin permissions
   PERMISSIONS: {

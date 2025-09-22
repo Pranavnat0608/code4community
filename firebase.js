@@ -19,15 +19,10 @@ const provider = new GoogleAuthProvider();
 
 // Initialize App Check for production security
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
-  try {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-      isTokenAutoRefreshEnabled: true
-    });
-    console.log('App Check initialized successfully');
-  } catch (error) {
-    console.error('App Check initialization failed:', error);
-  }
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+    isTokenAutoRefreshEnabled: true
+  });
 }
 
 // Configure Google provider for better OAuth experience

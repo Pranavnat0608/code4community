@@ -91,6 +91,11 @@ const initializeFirestore = async () => {
           console.log('Token length:', token.token.length);
           console.log('App Check token will be automatically attached to Firestore requests');
           console.log('Firestore is now ready with App Check token:', token.token.substring(0, 20) + '...');
+          
+          // Debug: Check if the App Check instance is properly associated
+          console.log('App Check instance name:', window.firebaseAppCheck.name);
+          console.log('Firebase app name:', app.name);
+          console.log('App Check and Firestore should be using the same Firebase app instance');
         }
       } catch (error) {
         console.error('Error getting App Check token for Firestore:', error);

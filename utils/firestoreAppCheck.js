@@ -44,9 +44,11 @@ export async function configureFirestoreAppCheck() {
  */
 export async function refreshFirestoreAppCheckToken() {
   try {
-    const { getAppCheck } = await import('firebase/app-check');
-    const appCheck = getAppCheck(app);
-    const token = await getToken(appCheck, true); // Force refresh
+    // Use the App Check instance from window
+    if (!window.firebaseAppCheck) {
+      throw new Error('App Check not initialized');
+    }
+    const token = await getToken(window.firebaseAppCheck, true); // Force refresh
     
     if (token && token.token) {
       appCheckToken = token.token;

@@ -21,10 +21,13 @@ export async function getAppCheckToken() {
         // Wait a bit for App Check to initialize
         await new Promise(resolve => setTimeout(resolve, attempt * 200));
         
-        // Try to get the token directly using the App Check instance
-        const { getAppCheck } = await import('firebase/app-check');
-        const appCheck = getAppCheck(app);
-        const token = await getToken(appCheck, true); // true = force refresh
+        // Try to get the token using the App Check instance from window
+        let token;
+        if (window.firebaseAppCheck) {
+          token = await getToken(window.firebaseAppCheck, true); // true = force refresh
+        } else {
+          throw new Error('App Check not initialized');
+        }
         console.log('App Check token obtained:', token ? 'Yes' : 'No');
         
         if (token && token.token) {

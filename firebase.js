@@ -83,6 +83,7 @@ const initializeFirestore = async () => {
     // when the App Check instance is available on the same Firebase app
     firestore = getFirestore(app);
     console.log('Firestore initialized with App Check support');
+    console.log('Firestore instance created for app:', app.name);
     
     // Verify App Check is properly associated
     if (window.firebaseAppCheck) {

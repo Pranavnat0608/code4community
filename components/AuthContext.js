@@ -56,8 +56,14 @@ export function AuthProvider({ children }) {
       }
       
       const docRef = doc(firestore, "users", currentUser.uid);
+      console.log('Making Firestore getDoc request for document:', docRef.path);
       const docSnap = await getDoc(docRef);
       console.log('Firestore response received:', docSnap.exists());
+      if (docSnap.exists()) {
+        console.log('Document data retrieved successfully');
+      } else {
+        console.log('Document does not exist');
+      }
       
       if (docSnap.exists()) {
         const data = docSnap.data();

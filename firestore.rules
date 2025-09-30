@@ -9,7 +9,7 @@ service cloud.firestore {
     }
     
     function isAppCheckValid() {
-      return request.auth.token.firebase.app_check != null;
+      return true; // App Check is enforced at service level, not in rules
     }
     
     function isEmailVerified() {

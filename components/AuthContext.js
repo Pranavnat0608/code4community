@@ -44,7 +44,8 @@ export function AuthProvider({ children }) {
       // Debug: Check if App Check token is available before making request
       if (window.firebaseAppCheck) {
         try {
-          const token = await window.firebaseAppCheck.getToken();
+          const { getToken } = await import('firebase/app-check');
+          const token = await getToken(window.firebaseAppCheck);
           console.log('App Check token before Firestore request:', token ? 'Available' : 'Not available');
           if (token) {
             console.log('Token length before request:', token.token.length);

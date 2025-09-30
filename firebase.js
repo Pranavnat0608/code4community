@@ -82,13 +82,15 @@ const initializeFirestore = () => {
       console.log('App Check instance is available for Firestore');
       
       // Test token generation
-      window.firebaseAppCheck.getToken().then((token) => {
-        console.log('App Check token test for Firestore:', token ? 'Success' : 'Failed');
-        if (token) {
-          console.log('Token length:', token.token.length);
-        }
-      }).catch((error) => {
-        console.error('App Check token test failed:', error);
+      import('firebase/app-check').then(({ getToken }) => {
+        getToken(window.firebaseAppCheck).then((token) => {
+          console.log('App Check token test for Firestore:', token ? 'Success' : 'Failed');
+          if (token) {
+            console.log('Token length:', token.token.length);
+          }
+        }).catch((error) => {
+          console.error('App Check token test failed:', error);
+        });
       });
     } else {
       console.warn('App Check instance not available for Firestore');

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore";
-import { auth, provider, firestore, fetchSignInMethodsForEmail } from "@/firebase";
+import { auth, provider, getFirestoreInstance, fetchSignInMethodsForEmail } from "@/firebase";
 import { UserCache, CachePerformance } from "@/utils/cache";
 import { useAuth } from "@/components/AuthContext";
 import { validateEmail, validatePassword, sanitizeInput } from "@/utils/validation";

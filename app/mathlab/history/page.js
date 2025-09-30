@@ -6,7 +6,7 @@ import DashboardTopBar from "../../../components/DashboardTopBar";
 import MathLabSidebar from "../../../components/MathLabSidebar";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { doc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
-import { firestore } from "@/firebase";
+import { getFirestoreInstance } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance } from "@/utils/cache";
 import { canAccess } from "@/utils/authorization";
 

@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { auth, provider, firestore } from "@/firebase";
+import { auth, provider, getFirestoreInstance } from "@/firebase";
 import { signInWithPopup, createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/components/AuthContext";
@@ -106,6 +106,7 @@ export default function SignupPage() {
         updatedAt: serverTimestamp()
       };
       
+      const firestore = getFirestoreInstance();
       await setDoc(doc(firestore, "users", user.uid), userData);
       
       // Send email verification
@@ -157,6 +158,7 @@ export default function SignupPage() {
       const user = result.user;
       
       // Check if user exists in our database
+      const firestore = getFirestoreInstance();
       const userDoc = await getDoc(doc(firestore, "users", user.uid));
       
       if (!userDoc.exists()) {

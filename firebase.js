@@ -36,6 +36,8 @@ if (typeof window !== 'undefined') {
         
         if (token && token.token) {
           console.log('Firebase App Check is fully ready for Firestore operations');
+          // Initialize Firestore now that App Check is ready
+          initializeFirestore();
           window.firebaseAppCheckReady = true;
           window.dispatchEvent(new CustomEvent('firebaseAppCheckReady'));
         } else {
@@ -64,27 +66,20 @@ provider.setCustomParameters({
   access_type: 'offline'
 });
 
-// Initialize Firestore with App Check support
-const firestore = getFirestore(app);
+// Initialize Firestore - we'll create it after App Check is ready
+let firestore = null;
 
-// Configure Firestore to use App Check tokens
-if (typeof window !== 'undefined') {
-  // Set up App Check integration for Firestore
-  const setupFirestoreAppCheck = () => {
-    if (window.firebaseAppCheck) {
-      console.log('Configuring Firestore to use App Check tokens');
-      // Firestore will automatically use App Check tokens when the instance is available
-      // The App Check instance is already associated with the Firebase app
-    }
-  };
-  
-  // Set up when App Check is ready
-  if (window.firebaseAppCheckReady) {
-    setupFirestoreAppCheck();
-  } else {
-    window.addEventListener('firebaseAppCheckReady', setupFirestoreAppCheck);
+// Create Firestore instance after App Check is ready
+const initializeFirestore = () => {
+  if (!firestore) {
+    firestore = getFirestore(app);
+    console.log('Firestore initialized with App Check support');
   }
-}
+  return firestore;
+};
 
-export { auth, provider, firestore, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail, app };
+// Export getter for firestore to ensure it's initialized with App Check
+export const getFirestoreInstance = () => initializeFirestore();
+
+export { auth, provider, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail, app };
 export default app;

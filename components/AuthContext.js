@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, firestore } from "@/firebase";
+import { auth, getFirestoreInstance } from "@/firebase";
 import { UserCache, CachePerformance } from "@/utils/cache";
 import { waitForAppCheck } from "@/utils/waitForAppCheck";
 
@@ -39,6 +39,7 @@ export function AuthProvider({ children }) {
 
       // Fetch from Firestore
       console.log('Making Firestore request for user:', currentUser.uid);
+      const firestore = getFirestoreInstance();
       const docRef = doc(firestore, "users", currentUser.uid);
       const docSnap = await getDoc(docRef);
       console.log('Firestore response received:', docSnap.exists());

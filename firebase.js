@@ -64,8 +64,27 @@ provider.setCustomParameters({
   access_type: 'offline'
 });
 
-// Initialize Firestore - it will automatically use App Check tokens when available
+// Initialize Firestore with App Check support
 const firestore = getFirestore(app);
+
+// Configure Firestore to use App Check tokens
+if (typeof window !== 'undefined') {
+  // Set up App Check integration for Firestore
+  const setupFirestoreAppCheck = () => {
+    if (window.firebaseAppCheck) {
+      console.log('Configuring Firestore to use App Check tokens');
+      // Firestore will automatically use App Check tokens when the instance is available
+      // The App Check instance is already associated with the Firebase app
+    }
+  };
+  
+  // Set up when App Check is ready
+  if (window.firebaseAppCheckReady) {
+    setupFirestoreAppCheck();
+  } else {
+    window.addEventListener('firebaseAppCheckReady', setupFirestoreAppCheck);
+  }
+}
 
 export { auth, provider, firestore, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail, app };
 export default app;

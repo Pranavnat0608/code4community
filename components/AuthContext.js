@@ -25,6 +25,7 @@ export function AuthProvider({ children }) {
     try {
       // Wait for App Check to be ready before making Firestore requests
       await waitForAppCheck();
+      console.log('App Check is ready, proceeding with Firestore request');
       
       // Check cache first unless force refresh
       if (!forceRefresh) {
@@ -37,8 +38,10 @@ export function AuthProvider({ children }) {
       }
 
       // Fetch from Firestore
+      console.log('Making Firestore request for user:', currentUser.uid);
       const docRef = doc(firestore, "users", currentUser.uid);
       const docSnap = await getDoc(docRef);
+      console.log('Firestore response received:', docSnap.exists());
       
       if (docSnap.exists()) {
         const data = docSnap.data();

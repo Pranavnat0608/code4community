@@ -37,6 +37,12 @@ if (typeof window !== 'undefined') {
         if (token && token.token) {
           console.log('Firebase App Check is fully ready for Firestore operations');
           console.log('App Check token available for Firestore:', token.token.substring(0, 20) + '...');
+          
+          // Ensure App Check instance is properly associated with the app
+          console.log('App Check instance app name:', appCheck.app.name);
+          console.log('Firebase app name:', app.name);
+          console.log('App Check and Firebase app match:', appCheck.app.name === app.name);
+          
           // Initialize Firestore now that App Check is ready
           await initializeFirestore();
           window.firebaseAppCheckReady = true;
@@ -93,9 +99,9 @@ const initializeFirestore = async () => {
           console.log('Firestore is now ready with App Check token:', token.token.substring(0, 20) + '...');
           
           // Debug: Check if the App Check instance is properly associated
-          console.log('App Check instance name:', window.firebaseAppCheck.name);
+          console.log('App Check instance app name:', window.firebaseAppCheck.app.name);
           console.log('Firebase app name:', app.name);
-          console.log('App Check and Firestore should be using the same Firebase app instance');
+          console.log('App Check and Firestore using same app:', window.firebaseAppCheck.app.name === app.name);
         }
       } catch (error) {
         console.error('Error getting App Check token for Firestore:', error);

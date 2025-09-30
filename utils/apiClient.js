@@ -12,19 +12,33 @@ export async function getAppCheckToken() {
       return null; // Server-side, no App Check token needed
     }
     
-    // Check if App Check is available
-    if (!window.firebase || !window.firebase.appCheck) {
-      console.warn('Firebase App Check not available');
+    // Wait a bit for App Check to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Check if Firebase is available
+    if (!window.firebase) {
+      console.error('Firebase not available on window object');
       return null;
     }
     
-    const token = await getToken(app, false); // false = don't force refresh
+    // Try to get the token with force refresh to ensure we get a fresh one
+    const token = await getToken(app, true); // true = force refresh
     console.log('App Check token obtained:', token ? 'Yes' : 'No');
-    return token ? token.token : null;
+    
+    if (token && token.token) {
+      console.log('Token length:', token.token.length);
+      return token.token;
+    } else {
+      console.error('No token returned from getToken');
+      return null;
+    }
   } catch (error) {
     console.error('Failed to get App Check token:', error);
-    // For development, we might want to continue without App Check
-    // In production, you should handle this more strictly
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      stack: error.stack
+    });
     return null;
   }
 }

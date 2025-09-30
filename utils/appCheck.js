@@ -95,29 +95,22 @@ export function withAppCheck(handler) {
       return handler(request, context);
     }
 
-    // For development/testing, we'll be more permissive
-    // In production, you should enable strict validation
+    // Validate App Check token
     const validation = await validateAppCheckToken(request);
     
     if (!validation.valid) {
-      // Log the validation failure for debugging
       console.log('App Check validation failed:', validation.error);
       
-      // For now, we'll allow the request to proceed but log the issue
-      // In production, you should return 403 here
-      console.warn('Allowing request without valid App Check token (development mode)');
-      
-      // Uncomment the following lines for production:
-      // return new Response(
-      //   JSON.stringify({ 
-      //     error: 'App Check validation failed', 
-      //     details: validation.error 
-      //   }),
-      //   { 
-      //     status: 403,
-      //     headers: { 'Content-Type': 'application/json' }
-      //   }
-      // );
+      return new Response(
+        JSON.stringify({ 
+          error: 'App Check validation failed', 
+          details: validation.error 
+        }),
+        { 
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Add App Check claims to request for use in handler

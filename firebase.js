@@ -12,10 +12,16 @@ const provider = new GoogleAuthProvider();
 
 // Initialize App Check for maximum security (development and production)
 if (typeof window !== 'undefined') {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-    isTokenAutoRefreshEnabled: true
-  });
+  try {
+    console.log('Initializing Firebase App Check with site key:', recaptchaSiteKey);
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true
+    });
+    console.log('Firebase App Check initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize Firebase App Check:', error);
+  }
 }
 
 // Configure Google provider for better OAuth experience

@@ -32,6 +32,10 @@ if (typeof window !== 'undefined') {
         const { getToken } = await import('firebase/app-check');
         const token = await getToken(appCheck, false);
         console.log('Test token generation successful:', token ? 'Yes' : 'No');
+        
+        // Configure Firestore App Check
+        const { configureFirestoreAppCheck } = await import('./utils/firestoreAppCheck.js');
+        await configureFirestoreAppCheck();
       } catch (error) {
         console.error('Test token generation failed:', error);
       }

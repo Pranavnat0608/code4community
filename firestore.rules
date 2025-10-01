@@ -139,19 +139,18 @@ service cloud.firestore {
     
     // TutoringRequests collection - Contains math lab tutoring requests
     match /tutoringRequests/{requestId} {
-      // Allow read: Students can read their own requests, tutors can read pending requests
+      // Allow read: Users can read their own requests, or any pending requests
       allow read: if isAuthenticated() && (
-                      // Students can read their own requests
-                      (isStudent() && resource.data.studentId == request.auth.uid) ||
-                      // Tutors can read pending requests
-                      (isTeacher() && resource.data.status == 'pending') ||
+                      // Users can read their own requests
+                      resource.data.studentId == request.auth.uid ||
+                      // Anyone can read pending requests
+                      resource.data.status == 'pending' ||
                       // Admins can read all requests
                       isAdmin()
                     );
       
-      // Allow create: Only students can create requests
-      allow create: if isAuthenticated() && 
-                      isStudent() &&
+      // Allow create: Any authenticated user can create requests
+      allow create: if isAuthenticated() &&
                       // Validate required fields
                       request.resource.data.keys().hasAll(['studentId', 'studentName', 'course', 'description', 'status', 'createdAt', 'updatedAt']) &&
                       // Validate field types and values
@@ -181,48 +180,42 @@ service cloud.firestore {
                       (!('completedAt' in request.resource.data) || 
                        (request.resource.data.completedAt is timestamp));
       
-      // Allow update: Students can update their own pending requests, tutors can accept/complete
+      // Allow update: Users can update their own requests, or admins can update any
       allow update: if isAuthenticated() && (
-                        // Students can only update their own pending requests
-                        (isStudent() && 
-                         resource.data.studentId == request.auth.uid && 
+                        // Users can update their own pending requests
+                        (resource.data.studentId == request.auth.uid && 
                          resource.data.status == 'pending' &&
                          // Only allow updating description and course
                          request.resource.data.studentId == resource.data.studentId &&
                          request.resource.data.status == resource.data.status &&
                          request.resource.data.createdAt == resource.data.createdAt &&
                          request.resource.data.updatedAt is timestamp) ||
-                        // Tutors can accept pending requests
-                        (isTeacher() && 
-                         resource.data.status == 'pending' &&
+                        // Users can accept pending requests (become tutors)
+                        (resource.data.status == 'pending' &&
                          request.resource.data.status == 'accepted' &&
                          request.resource.data.tutorId == request.auth.uid &&
                          request.resource.data.acceptedAt is timestamp &&
                          request.resource.data.updatedAt is timestamp) ||
-                        // Tutors can complete accepted requests they're assigned to
-                        (isTeacher() && 
-                         resource.data.status == 'accepted' &&
+                        // Users can complete accepted requests they're assigned to
+                        (resource.data.status == 'accepted' &&
                          resource.data.tutorId == request.auth.uid &&
                          request.resource.data.status == 'completed' &&
                          request.resource.data.completedAt is timestamp &&
                          request.resource.data.updatedAt is timestamp) ||
-                        // Students can cancel their own requests
-                        (isStudent() && 
-                         resource.data.studentId == request.auth.uid &&
+                        // Users can cancel their own requests
+                        (resource.data.studentId == request.auth.uid &&
                          request.resource.data.status == 'cancelled' &&
                          request.resource.data.updatedAt is timestamp) ||
                         // Admins can update any request
                         isAdmin()
                       );
       
-      // Allow delete: Students can delete their own pending requests, admins can delete any,
-      // and teachers can delete old pending requests (for cleanup)
+      // Allow delete: Users can delete their own pending requests, or admins can delete any
       allow delete: if isAuthenticated() && (
-                        (isStudent() && 
-                         resource.data.studentId == request.auth.uid && 
+                        (resource.data.studentId == request.auth.uid && 
                          resource.data.status == 'pending') ||
-                        // Allow teachers to delete old pending requests for cleanup
-                        (isTeacher() && resource.data.status == 'pending') ||
+                        // Allow anyone to delete old pending requests for cleanup
+                        (resource.data.status == 'pending') ||
                         isAdmin()
                       );
     }
@@ -231,17 +224,16 @@ service cloud.firestore {
     match /completedSessions/{sessionId} {
       // Allow read: Users can read sessions they participated in
       allow read: if isAuthenticated() && (
-                      // Students can read sessions they participated in
-                      (isStudent() && resource.data.studentId == request.auth.uid) ||
-                      // Teachers can read sessions they tutored
-                      (isTeacher() && resource.data.tutorId == request.auth.uid) ||
+                      // Users can read sessions they participated in
+                      resource.data.studentId == request.auth.uid ||
+                      // Users can read sessions they tutored
+                      resource.data.tutorId == request.auth.uid ||
                       // Admins can read all sessions
                       isAdminUser()
                     );
       
-      // Allow create: Only teachers can create completed sessions (when ending a session)
-      allow create: if isAuthenticated() && 
-                      isTeacher() &&
+      // Allow create: Any authenticated user can create completed sessions
+      allow create: if isAuthenticated() &&
                       // Validate required fields
                       request.resource.data.keys().hasAll(['studentId', 'studentName', 'tutorId', 'tutorName', 'course', 'startTime', 'endTime', 'duration', 'completedAt', 'status']) &&
                       // Validate field types and values

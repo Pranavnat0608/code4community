@@ -7,7 +7,22 @@ import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 let firebaseConfig;
 let recaptchaSiteKey;
 
-if (process.env.NODE_ENV === 'development') {
+// Check if we're in a build environment (no environment variables available)
+const isBuildTime = typeof window === 'undefined' && !process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
+if (isBuildTime) {
+  // Build time - use placeholder config to prevent errors
+  firebaseConfig = {
+    apiKey: "build-time-placeholder",
+    authDomain: "build-time-placeholder",
+    projectId: "build-time-placeholder",
+    storageBucket: "build-time-placeholder",
+    messagingSenderId: "build-time-placeholder",
+    appId: "build-time-placeholder"
+  };
+  recaptchaSiteKey = null;
+  console.log('Using build-time placeholder Firebase config');
+} else if (process.env.NODE_ENV === 'development') {
   // Development environment - use dev keys
   try {
     const devConfig = require('./keys.dev.js');
@@ -46,8 +61,8 @@ const auth = getAuth(app);
 const firestore = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-// Initialize App Check only in production
-if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && recaptchaSiteKey) {
+// Initialize App Check only in production and not during build time
+if (!isBuildTime && typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && recaptchaSiteKey) {
   try {
     const appCheck = initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(recaptchaSiteKey),
@@ -59,6 +74,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && r
   }
 } else if (process.env.NODE_ENV === 'development') {
   console.log('Firebase initialized without App Check (development mode)');
+} else if (isBuildTime) {
+  console.log('Firebase initialized without App Check (build time)');
 }
 
 // Configure Google provider

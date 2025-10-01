@@ -3,11 +3,9 @@
  * Admin email for tutor management
  */
 
-import { adminEmail } from '../keys.js';
-
 export const ADMIN_CONFIG = {
-  // Admin email from keys.js
-  ADMIN_EMAIL: adminEmail,
+  // Admin email - hardcoded for now, can be moved to env vars if needed
+  ADMIN_EMAIL: '1021676@lcps.org',
   
   // Admin permissions
   PERMISSIONS: {

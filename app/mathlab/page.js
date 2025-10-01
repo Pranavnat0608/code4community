@@ -7,7 +7,7 @@ import MathLabSidebar from "../../components/MathLabSidebar";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { AppCardSkeleton, RequestCardSkeleton } from "../../components/SkeletonLoader";
 import { doc, updateDoc, collection, query, where, getDocs, addDoc, onSnapshot, deleteDoc } from "firebase/firestore";
-import { getFirestoreInstance } from "@/firebase";
+import { firestore } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance } from "@/utils/cache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
 import { canAccess, canModify, isTutorOrHigher, ROLES } from "@/utils/authorization";

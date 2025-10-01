@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { doc, collection, query, where, getDocs, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
-import { getFirestoreInstance } from "@/firebase";
+import { firestore } from "@/firebase";
 import { UserCache, CachePerformance } from "@/utils/cache";
 import { isAdminUser } from "@/utils/authorization";
 

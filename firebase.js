@@ -56,10 +56,22 @@ if (isBuildTime) {
 }
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const firestore = getFirestore(app);
-const provider = new GoogleAuthProvider();
+let app, auth, firestore, provider;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  firestore = getFirestore(app);
+  provider = new GoogleAuthProvider();
+  console.log('Firebase initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize Firebase:', error);
+  // Create fallback instances to prevent undefined errors
+  app = null;
+  auth = null;
+  firestore = null;
+  provider = null;
+}
 
 // Initialize App Check only in production and not during build time
 if (!isBuildTime && typeof window !== 'undefined' && process.env.NODE_ENV !== 'development' && recaptchaSiteKey) {
@@ -83,6 +95,11 @@ provider.setCustomParameters({
   prompt: 'select_account',
   access_type: 'offline'
 });
+
+// Export Firebase instances with validation
+if (!firestore) {
+  console.error('CRITICAL: Firestore is not initialized properly');
+}
 
 export { auth, provider, firestore, createUserWithEmailAndPassword, sendEmailVerification, fetchSignInMethodsForEmail, app };
 export default app;

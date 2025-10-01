@@ -69,9 +69,9 @@ service cloud.firestore {
       // Allow read access to own user document
       allow read: if isAuthenticated() && isOwner(userId);
       
-      // Allow create: Only during signup process
-      allow create: if isAuthenticated() &&                       isOwner(userId) &&
-                      isEmailVerified() &&
+      // Allow create: Only during signup process (email verification not required for initial creation)
+      allow create: if isAuthenticated() && 
+                      isOwner(userId) &&
                       // Validate required fields
                       request.resource.data.keys().hasAll(['email', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
                       // Validate field types and values
@@ -90,7 +90,7 @@ service cloud.firestore {
                       request.resource.data.role == 'student';
       
       // Allow update: Only own document with restrictions, or admin updates
-      allow update: if isAuthenticated() &&                       isEmailVerified() && (
+      allow update: if isAuthenticated() && (
                         // Own document updates
                         (isOwner(userId) &&
                          // Prevent changing critical fields
@@ -140,7 +140,7 @@ service cloud.firestore {
     // TutoringRequests collection - Contains math lab tutoring requests
     match /tutoringRequests/{requestId} {
       // Allow read: Students can read their own requests, tutors can read pending requests
-      allow read: if isAuthenticated() &&                     isEmailVerified() && (
+      allow read: if isAuthenticated() && (
                       // Students can read their own requests
                       (isStudent() && resource.data.studentId == request.auth.uid) ||
                       // Tutors can read pending requests
@@ -150,7 +150,7 @@ service cloud.firestore {
                     );
       
       // Allow create: Only students can create requests
-      allow create: if isAuthenticated() &&                       isEmailVerified() && 
+      allow create: if isAuthenticated() && 
                       isStudent() &&
                       // Validate required fields
                       request.resource.data.keys().hasAll(['studentId', 'studentName', 'course', 'description', 'status', 'createdAt', 'updatedAt']) &&
@@ -182,7 +182,7 @@ service cloud.firestore {
                        (request.resource.data.completedAt is timestamp));
       
       // Allow update: Students can update their own pending requests, tutors can accept/complete
-      allow update: if isAuthenticated() &&                       isEmailVerified() && (
+      allow update: if isAuthenticated() && (
                         // Students can only update their own pending requests
                         (isStudent() && 
                          resource.data.studentId == request.auth.uid && 
@@ -217,7 +217,7 @@ service cloud.firestore {
       
       // Allow delete: Students can delete their own pending requests, admins can delete any,
       // and teachers can delete old pending requests (for cleanup)
-      allow delete: if isAuthenticated() &&                       isEmailVerified() && (
+      allow delete: if isAuthenticated() && (
                         (isStudent() && 
                          resource.data.studentId == request.auth.uid && 
                          resource.data.status == 'pending') ||
@@ -230,7 +230,7 @@ service cloud.firestore {
     // CompletedSessions collection - Contains completed tutoring session history
     match /completedSessions/{sessionId} {
       // Allow read: Users can read sessions they participated in
-      allow read: if isAuthenticated() &&                     isEmailVerified() && (
+      allow read: if isAuthenticated() && (
                       // Students can read sessions they participated in
                       (isStudent() && resource.data.studentId == request.auth.uid) ||
                       // Teachers can read sessions they tutored
@@ -240,7 +240,7 @@ service cloud.firestore {
                     );
       
       // Allow create: Only teachers can create completed sessions (when ending a session)
-      allow create: if isAuthenticated() &&                       isEmailVerified() && 
+      allow create: if isAuthenticated() && 
                       isTeacher() &&
                       // Validate required fields
                       request.resource.data.keys().hasAll(['studentId', 'studentName', 'tutorId', 'tutorName', 'course', 'startTime', 'endTime', 'duration', 'completedAt', 'status']) &&

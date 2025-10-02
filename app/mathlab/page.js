@@ -14,7 +14,7 @@ import { canAccess, canModify, isTutorOrHigher, ROLES } from "@/utils/authorizat
 import Image from "next/image";
 
 export default function MathLabPage() {
-  const { user, userData, isEmailVerified } = useAuth();
+  const { user, userData, isEmailVerified, loading } = useAuth();
   const router = useRouter();
   const [selectedCourse, setSelectedCourse] = useState("");
   const [isMatching, setIsMatching] = useState(false);
@@ -743,6 +743,21 @@ export default function MathLabPage() {
       handleRoleSelection();
     }
   }, [showRoleSelection, displayUser, handleRoleSelection]);
+
+  // Show loading while AuthContext is loading
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    router.push('/login');
+    return null;
+  }
 
   // Don't show loading state - use cached data immediately
   if (!displayUser) {

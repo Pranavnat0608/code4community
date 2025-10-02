@@ -8,7 +8,7 @@ import { UserCache, CachePerformance } from "@/utils/cache";
 
 export default function Welcome() {
   const authContext = useAuth();
-  const { userData, isEmailVerified, loading: authLoading } = authContext;
+  const { user, userData, isEmailVerified, loading: authLoading } = authContext;
   const router = useRouter();
   const [cachedUser, setCachedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,12 +117,12 @@ export default function Welcome() {
   }, [userData, isEmailVerified, router]);
 
   const handleMathLabClick = useCallback(() => {
-    if (userData || cachedUser) {
+    if (user && (userData || cachedUser)) {
       router.push('/mathlab');
     } else {
       router.push('/login?redirectTo=/mathlab');
     }
-  }, [userData, cachedUser, router]);
+  }, [user, userData, cachedUser, router]);
 
   // Prioritize fresh userData over cached data for accuracy
   const displayUser = userData || cachedUser;
@@ -154,7 +154,7 @@ export default function Welcome() {
   );
 
   // Show loading state
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <DashboardTopBar 
@@ -172,6 +172,12 @@ export default function Welcome() {
         </div>
       </div>
     );
+  }
+
+  // Redirect to login if not authenticated
+  if (!user) {
+    router.push('/login');
+    return null;
   }
 
   return (

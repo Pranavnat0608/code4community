@@ -174,11 +174,6 @@ export default function Welcome() {
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

@@ -149,7 +149,7 @@ function CheckEmailContent() {
                 </button>
                 
                 <button
-                  onClick={() => router.push('/login?redirectTo=/welcome')}
+                  onClick={() => router.push('/login')}
                   className="w-full bg-gray-200 text-gray-800 py-3 px-4 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
                 >
                   Back to Login

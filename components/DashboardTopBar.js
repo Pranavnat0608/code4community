@@ -245,13 +245,13 @@ export default function DashboardTopBar({ title = "BRHS Utilities", onNavigation
             {!displayUser && (
               <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => router.push('/login?redirectTo=/welcome')}
+                  onClick={() => router.push('/login')}
                   className="btn-secondary px-4 py-2 text-sm font-medium"
                 >
                   Sign In
                 </button>
                 <button
-                  onClick={() => router.push('/signup?redirectTo=/welcome')}
+                  onClick={() => router.push('/signup')}
                   className="btn-primary px-4 py-2 text-sm font-medium"
                 >
                   Sign Up

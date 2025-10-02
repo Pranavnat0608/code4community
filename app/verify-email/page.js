@@ -74,10 +74,7 @@ function VerifyEmailContent() {
           }
           
           setTimeout(() => {
-            // Check for redirectTo parameter
-            const redirectTo = searchParams.get('redirectTo');
-            const redirectUrl = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/welcome';
-            router.push(redirectUrl);
+            router.push('/welcome');
           }, 2000);
           return;
         }
@@ -121,9 +118,7 @@ function VerifyEmailContent() {
             try {
               window.close();
             } catch (error) {
-              const redirectTo = searchParams.get('redirectTo');
-              const redirectUrl = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/welcome';
-              router.push(redirectUrl);
+              router.push('/welcome');
             }
           }, 2000);
             return;
@@ -176,9 +171,7 @@ function VerifyEmailContent() {
           try {
             window.close();
           } catch (error) {
-            const redirectTo = searchParams.get('redirectTo');
-            const redirectUrl = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/welcome';
-            router.push(redirectUrl);
+            router.push('/welcome');
           }
         }, 2000);
 
@@ -219,9 +212,7 @@ function VerifyEmailContent() {
                   try {
                     window.close();
                   } catch (error) {
-                    const redirectTo = searchParams.get('redirectTo');
-                    const redirectUrl = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/welcome';
-                    router.push(redirectUrl);
+                    router.push('/welcome');
                   }
                 }, 2000);
               } else {
@@ -306,9 +297,7 @@ function VerifyEmailContent() {
           try {
             window.close();
           } catch (error) {
-            const redirectTo = searchParams.get('redirectTo');
-            const redirectUrl = redirectTo && redirectTo.startsWith('/') ? redirectTo : '/welcome';
-            router.push(redirectUrl);
+            router.push('/welcome');
           }
         }, 2000);
       }

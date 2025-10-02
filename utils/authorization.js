@@ -56,7 +56,25 @@ export const hasPermission = (userRole, resource, permission) => {
   }
   
   const rolePermissions = ROLE_PERMISSIONS[userRole];
-  return rolePermissions[resource]?.includes(permission) || false;
+  const userPermissions = rolePermissions[resource] || [];
+  
+  // Check if user has the exact permission
+  if (userPermissions.includes(permission)) {
+    return true;
+  }
+  
+  // Check if user has higher-level permissions that include the requested permission
+  if (permission === PERMISSIONS.READ) {
+    // READ is included in WRITE and MANAGE
+    return userPermissions.includes(PERMISSIONS.WRITE) || userPermissions.includes(PERMISSIONS.MANAGE);
+  }
+  
+  if (permission === PERMISSIONS.WRITE) {
+    // WRITE is included in MANAGE
+    return userPermissions.includes(PERMISSIONS.MANAGE);
+  }
+  
+  return false;
 };
 
 // Check if user can access a resource

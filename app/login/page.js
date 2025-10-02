@@ -76,6 +76,25 @@ export default function LoginPage() {
       const result = await signInWithEmailAndPassword(auth, sanitizedEmail, password);
       const user = result.user;
       
+      // Check if user should be admin and update role if needed
+      const isAdmin = isAdminEmail(user.email);
+      if (isAdmin) {
+        try {
+          const userDoc = await getDoc(doc(firestore, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            if (userData.role !== 'admin') {
+              await updateDoc(doc(firestore, "users", user.uid), {
+                role: 'admin',
+                updatedAt: new Date()
+              });
+            }
+          }
+        } catch (error) {
+          console.error("[LoginPage] handleLogin: Error updating admin role", error);
+        }
+      }
+      
       // Email/password login: allow unverified users to proceed; verification handled elsewhere
       
       // Redirect will be handled by useEffect above
@@ -150,11 +169,13 @@ export default function LoginPage() {
       if (!userDoc.exists()) {
         // User doesn't exist, create account automatically
         try {
+          // Check if user is admin and set role accordingly
+          const isAdmin = isAdminEmail(user.email);
           const userData = {
             email: user.email,
             displayName: user.displayName || "",
             photoURL: user.photoURL || "",
-            role: "student", // Default role; admin elevation handled by update path
+            role: isAdmin ? "admin" : "student",
             mathLabRole: "", // Empty math lab role - user will choose later
             createdAt: new Date(),
             updatedAt: new Date()

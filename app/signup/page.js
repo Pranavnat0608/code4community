@@ -94,15 +94,16 @@ export default function SignupPage() {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       const user = result.user;
       
-      // Always create user with default student role; admin elevation happens via update paths
-      const userData = {
-        email: user.email,
-        displayName: displayName.trim(),
-        photoURL: "",
-        role: "student",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      };
+          // Check if user is admin and set role accordingly
+          const isAdmin = isAdminEmail(user.email);
+          const userData = {
+            email: user.email,
+            displayName: displayName.trim(),
+            photoURL: "",
+            role: isAdmin ? "admin" : "student",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
       
       await setDoc(doc(firestore, "users", user.uid), userData);
       
@@ -159,15 +160,17 @@ export default function SignupPage() {
       if (!userDoc.exists()) {
         // User doesn't exist, create account automatically
         try {
-          const userData = {
-            email: user.email,
-            displayName: user.displayName || "",
-            photoURL: user.photoURL || "",
-            role: "student", // Default role
-            mathLabRole: "", // Empty math lab role - user will choose later
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          };
+            // Check if user is admin and set role accordingly
+            const isAdmin = isAdminEmail(user.email);
+            const userData = {
+              email: user.email,
+              displayName: user.displayName || "",
+              photoURL: user.photoURL || "",
+              role: isAdmin ? "admin" : "student",
+              mathLabRole: "", // Empty math lab role - user will choose later
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            };
           
           await setDoc(doc(firestore, "users", user.uid), userData);
         } catch (createError) {

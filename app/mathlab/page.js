@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from "../../components/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import MathLabSidebar from "../../components/MathLabSidebar";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -32,6 +32,24 @@ export default function MathLabPage() {
   const [roleChangeMessage, setRoleChangeMessage] = useState("");
   const [sessionStatus, setSessionStatus] = useState(null); // 'accepted', 'started', 'ended'
   const [sessionEndData, setSessionEndData] = useState(null); // Data for session over screen
+  
+  // Use refs to avoid dependency issues
+  const studentRequestRef = useRef(studentRequest);
+  const previousStudentRequestRef = useRef(previousStudentRequest);
+  const sessionDurationRef = useRef(sessionDuration);
+  
+  // Update refs when values change
+  useEffect(() => {
+    studentRequestRef.current = studentRequest;
+  }, [studentRequest]);
+  
+  useEffect(() => {
+    previousStudentRequestRef.current = previousStudentRequest;
+  }, [previousStudentRequest]);
+  
+  useEffect(() => {
+    sessionDurationRef.current = sessionDuration;
+  }, [sessionDuration]);
 
   // Available courses - memoized for performance
   const courses = useMemo(() => [
@@ -394,16 +412,16 @@ export default function MathLabPage() {
           } else {
             // If we had a student request but now it's gone, the session ended
             console.log('[StudentRequest] No requests found, checking if session ended:', {
-              hadStudentRequest: !!studentRequest,
-              hadPreviousRequest: !!previousStudentRequest,
-              studentRequestStatus: studentRequest?.status,
-              previousRequestStatus: previousStudentRequest?.status,
-              shouldShowEndedScreen: (studentRequest && studentRequest.status === 'accepted') || 
-                                   (previousStudentRequest && previousStudentRequest.status === 'accepted')
+              hadStudentRequest: !!studentRequestRef.current,
+              hadPreviousRequest: !!previousStudentRequestRef.current,
+              studentRequestStatus: studentRequestRef.current?.status,
+              previousRequestStatus: previousStudentRequestRef.current?.status,
+              shouldShowEndedScreen: (studentRequestRef.current && studentRequestRef.current.status === 'accepted') || 
+                                   (previousStudentRequestRef.current && previousStudentRequestRef.current.status === 'accepted')
             });
             
             // Check if session ended using current or previous request state
-            const requestToCheck = studentRequest || previousStudentRequest;
+            const requestToCheck = studentRequestRef.current || previousStudentRequestRef.current;
             if (requestToCheck && requestToCheck.status === 'accepted') {
               // Session ended - show session ended screen
               console.log('[StudentRequest] Session ended! Showing session ended screen');
@@ -415,7 +433,7 @@ export default function MathLabPage() {
                 course: requestToCheck.course,
                 startTime: requestToCheck.sessionStartedAt || requestToCheck.acceptedAt,
                 endTime: new Date(),
-                duration: sessionDuration
+                duration: sessionDurationRef.currentRef.current
               });
               setSessionStatus('ended');
             }
@@ -485,15 +503,15 @@ export default function MathLabPage() {
         } else {
           // If we had a student request but now it's gone, the session ended
           console.log('[StudentRequest] No requests found, checking if session ended:', {
-            hadStudentRequest: !!studentRequest,
-            hadPreviousRequest: !!previousStudentRequest,
-            studentRequestStatus: studentRequest?.status,
-            previousRequestStatus: previousStudentRequest?.status,
-            shouldShowEndedScreen: (studentRequest && studentRequest.status === 'accepted') || 
-                                 (previousStudentRequest && previousStudentRequest.status === 'accepted')
+            hadStudentRequest: !!studentRequestRef.current,
+            hadPreviousRequest: !!previousStudentRequestRef.current,
+            studentRequestStatus: studentRequestRef.current?.status,
+            previousRequestStatus: previousStudentRequestRef.current?.status,
+            shouldShowEndedScreen: (studentRequestRef.current && studentRequestRef.current.status === 'accepted') || 
+                                 (previousStudentRequestRef.current && previousStudentRequestRef.current.status === 'accepted')
           });
           
-          const requestToCheck = studentRequest || previousStudentRequest;
+          const requestToCheck = studentRequestRef.current || previousStudentRequestRef.current;
           if (requestToCheck && requestToCheck.status === 'accepted') {
             console.log('[StudentRequest] Session ended! Showing session ended screen');
             setSessionEndData({
@@ -504,7 +522,7 @@ export default function MathLabPage() {
               course: requestToCheck.course,
               startTime: requestToCheck.sessionStartedAt || requestToCheck.acceptedAt,
               endTime: new Date(),
-              duration: sessionDuration
+              duration: sessionDurationRef.current
             });
             setSessionStatus('ended');
           }
@@ -532,15 +550,7 @@ export default function MathLabPage() {
   }, [
     displayUser?.mathLabRole, 
     user?.uid, 
-    cachedUser?.uid,
-    user?.email,
-    cachedUser?.email,
-    displayUser?.displayName,
-    displayUser?.firstName,
-    displayUser?.lastName,
-    studentRequest,
-    previousStudentRequest,
-    sessionDuration
+    cachedUser?.uid
   ]);
 
   // No dropdown overlay logic needed with native select
@@ -720,7 +730,7 @@ export default function MathLabPage() {
         course: activeSession.course,
         startTime: sessionStartTime,
         endTime: endTime,
-        duration: sessionDuration,
+        duration: sessionDurationRef.currentRef.current,
         completedAt: endTime,
         status: 'completed'
       };
@@ -748,7 +758,7 @@ export default function MathLabPage() {
         course: activeSession.course,
         startTime: sessionStartTime,
         endTime: endTime,
-        duration: sessionDuration
+        duration: sessionDurationRef.current
       });
       setSessionStatus('ended');
       

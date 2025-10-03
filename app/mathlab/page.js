@@ -434,11 +434,96 @@ export default function MathLabPage() {
       // Check immediately
       checkStudentRequest();
       
-      // Set up polling instead of real-time listener to avoid permission issues
-      const pollInterval = setInterval(checkStudentRequest, 2000); // Check every 2 seconds
+      // Set up real-time listener for instant updates
+      const q = query(
+        collection(firestore, "tutoringRequests"),
+        where("studentId", "==", user?.uid || cachedUser?.uid)
+      );
+      
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        console.log('[StudentRequest] Real-time update:', {
+          size: snapshot.size,
+          empty: snapshot.empty,
+          docs: snapshot.docs.map(d => ({ id: d.id, ...d.data() }))
+        });
+        
+        if (!snapshot.empty) {
+          const docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+          const match = docs.find(d => d.status === 'pending' || d.status === 'accepted');
+          
+          if (match && match.status === 'pending') {
+            setStudentRequest({
+              id: match.id,
+              course: match.course,
+              status: match.status,
+              createdAt: match.createdAt?.toDate ? match.createdAt.toDate() : new Date()
+            });
+            setPreviousStudentRequest(null);
+          } else if (match && match.status === 'accepted') {
+            const sessionStartedAt = match.sessionStartedAt?.toDate ? match.sessionStartedAt.toDate() : (match.sessionStartedAt ? new Date(match.sessionStartedAt) : null);
+            
+            setStudentRequest({
+              id: match.id,
+              course: match.course,
+              status: match.status,
+              tutorName: match.tutorName,
+              acceptedAt: match.acceptedAt?.toDate ? match.acceptedAt.toDate() : new Date(),
+              sessionStartedAt: sessionStartedAt
+            });
+            setPreviousStudentRequest(null);
+            
+            if (sessionStartedAt) {
+              setSessionStatus('started');
+              setSessionStartTime(sessionStartedAt);
+              const now = new Date();
+              const duration = Math.floor((now - sessionStartedAt) / 1000);
+              setSessionDuration(duration);
+            } else {
+              setSessionStatus('accepted');
+            }
+          }
+        } else {
+          // If we had a student request but now it's gone, the session ended
+          console.log('[StudentRequest] No requests found, checking if session ended:', {
+            hadStudentRequest: !!studentRequest,
+            hadPreviousRequest: !!previousStudentRequest,
+            studentRequestStatus: studentRequest?.status,
+            previousRequestStatus: previousStudentRequest?.status,
+            shouldShowEndedScreen: (studentRequest && studentRequest.status === 'accepted') || 
+                                 (previousStudentRequest && previousStudentRequest.status === 'accepted')
+          });
+          
+          const requestToCheck = studentRequest || previousStudentRequest;
+          if (requestToCheck && requestToCheck.status === 'accepted') {
+            console.log('[StudentRequest] Session ended! Showing session ended screen');
+            setSessionEndData({
+              studentName: (displayUser?.displayName && displayUser.displayName.trim()) || 
+                          ([displayUser?.firstName, displayUser?.lastName].filter(Boolean).join(' ').trim()) ||
+                          user?.email || cachedUser?.email || 'Student',
+              studentEmail: user?.email || cachedUser?.email || '',
+              course: requestToCheck.course,
+              startTime: requestToCheck.sessionStartedAt || requestToCheck.acceptedAt,
+              endTime: new Date(),
+              duration: sessionDuration
+            });
+            setSessionStatus('ended');
+          }
+          
+          if (studentRequest) {
+            setPreviousStudentRequest(studentRequest);
+          }
+          setStudentRequest(null);
+        }
+      }, (error) => {
+        console.error('[StudentRequest] Listener error:', error);
+        // Fallback to polling if listener fails
+        console.log('[StudentRequest] Falling back to polling due to listener error');
+        const pollInterval = setInterval(checkStudentRequest, 2000);
+        return () => clearInterval(pollInterval);
+      });
       
       return () => {
-        clearInterval(pollInterval);
+        unsubscribe();
       };
     } else {
       // If not a student, clear any existing student request state

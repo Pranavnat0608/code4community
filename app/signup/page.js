@@ -101,6 +101,7 @@ export default function SignupPage() {
             displayName: displayName.trim(),
             photoURL: "",
             role: isAdmin ? "admin" : "student",
+            mathLabRole: "", // Empty math lab role - user will choose later
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
           };

@@ -8,7 +8,6 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    
     function isEmailVerified() {
       return request.auth.token.email_verified == true;
     }
@@ -39,15 +38,36 @@ service cloud.firestore {
     
     function isAdminByEmail() {
       return isAuthenticated() && 
-             request.auth.token.email == '1021676@lcps.org'; // Hardcoded admin email
+             request.auth.token.email == '1021676@lcps.org';
+    }
+    
+    // Helper function to check if user is a tutor (by mathLabRole)
+    function isTutor() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mathLabRole == 'tutor';
+    }
+    
+    // Helper function to check if user is a student (by mathLabRole)
+    function isStudent() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mathLabRole == 'student';
+    }
+    
+    // Helper function to check if user is teacher or admin
+    function isTeacherOrAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
     }
     
     // Users collection - Contains user profile data
     match /users/{userId} {
-      // Allow read access to own user document or admins can read all
+      // Allow read: Own document or admins can read all
       allow read: if isAuthenticated() && (isOwner(userId) || isAdminByEmail());
       
-      // Allow create: Only during signup process (email verification not required for initial creation)
+      // Allow create: During signup process
       allow create: if isAuthenticated() && 
                       isOwner(userId) &&
                       // Validate required fields
@@ -67,7 +87,7 @@ service cloud.firestore {
                       // Allow admin role for admin emails, otherwise default to student
                       (isAdminByEmail() || request.resource.data.role == 'student');
       
-      // Allow update: Only own document with restrictions, or admin updates
+      // Allow update: Own document with restrictions, or admin updates
       allow update: if isAuthenticated() && (
                         // Own document updates
                         (isOwner(userId) &&
@@ -83,8 +103,6 @@ service cloud.firestore {
                          request.resource.data.updatedAt is timestamp &&
                          // Only allow role changes by admins or prevent role escalation
                          (isAdminByEmail() || request.resource.data.role == resource.data.role) &&
-                         // Allow owners to set/update mathLabRole to any valid value
-                         true &&
                          // Validate optional fields if present
                          (!('mathLabRole' in request.resource.data) || 
                           (request.resource.data.mathLabRole is string && 
@@ -92,7 +110,7 @@ service cloud.firestore {
                          (!('photoURL' in request.resource.data) || 
                           (request.resource.data.photoURL is string && 
                            request.resource.data.photoURL.size() <= 500))) ||
-                        // Admin updates (can modify any user) - simplified
+                        // Admin updates (can modify any user)
                         isAdminByEmail()
                       );
       
@@ -102,12 +120,20 @@ service cloud.firestore {
     
     // TutoringRequests collection - Contains math lab tutoring requests
     match /tutoringRequests/{requestId} {
-      // Allow read: Users can read their own requests, or any pending requests
+      // Allow read: 
+      // - Users can read their own requests (as student)
+      // - Tutors can read requests they're assigned to (as tutor)
+      // - Anyone can read pending requests (for tutor dashboard)
+      // - Teachers/admins can read all requests
       allow read: if isAuthenticated() && (
                       // Users can read their own requests
                       resource.data.studentId == request.auth.uid ||
-                      // Anyone can read pending requests
+                      // Tutors can read requests they're assigned to
+                      (isTutor() && resource.data.tutorId == request.auth.uid) ||
+                      // Anyone can read pending requests (for tutor dashboard)
                       resource.data.status == 'pending' ||
+                      // Teachers and admins can read all requests
+                      isTeacherOrAdmin() ||
                       // Admins can read all requests
                       isAdminByEmail()
                     );
@@ -143,76 +169,98 @@ service cloud.firestore {
                       (!('completedAt' in request.resource.data) || 
                        (request.resource.data.completedAt is timestamp));
       
-      // Allow update: Users can update their own requests, or admins can update any
+      // Allow update: 
+      // - Students can update their own pending requests
+      // - Tutors can update requests they're assigned to (accept, start session, complete)
+      // - Teachers/admins can update any request
       allow update: if isAuthenticated() && (
-                        // Users can update their own pending requests
+                        // Students can update their own pending requests
                         (resource.data.studentId == request.auth.uid && 
                          resource.data.status == 'pending' &&
                          // Only allow updating description and course
                          request.resource.data.studentId == resource.data.studentId &&
                          request.resource.data.status == resource.data.status &&
                          request.resource.data.createdAt == resource.data.createdAt &&
+                         request.resource.data.course is string &&
+                         isValidCourse(request.resource.data.course) &&
+                         request.resource.data.description is string &&
+                         request.resource.data.description.size() > 0 &&
+                         request.resource.data.description.size() <= 1000 &&
                          request.resource.data.updatedAt is timestamp) ||
-                        // Users can accept pending requests (become tutors)
-                        (resource.data.status == 'pending' &&
-                         request.resource.data.status == 'accepted' &&
-                         request.resource.data.tutorId == request.auth.uid &&
-                         request.resource.data.acceptedAt is timestamp &&
-                         request.resource.data.updatedAt is timestamp) ||
-                        // Users can complete accepted requests they're assigned to
-                        (resource.data.status == 'accepted' &&
+                        // Tutors can update requests they're assigned to
+                        (isTutor() && 
                          resource.data.tutorId == request.auth.uid &&
-                         request.resource.data.status == 'completed' &&
-                         request.resource.data.completedAt is timestamp &&
-                         request.resource.data.updatedAt is timestamp) ||
-                        // Users can cancel their own requests
-                        (resource.data.studentId == request.auth.uid &&
-                         request.resource.data.status == 'cancelled' &&
-                         request.resource.data.updatedAt is timestamp) ||
+                         // Allow status changes: pending -> accepted -> completed
+                         (request.resource.data.status == 'accepted' || 
+                          request.resource.data.status == 'completed') &&
+                         // Validate required fields for accepted/completed
+                         request.resource.data.tutorId == resource.data.tutorId &&
+                         request.resource.data.studentId == resource.data.studentId &&
+                         request.resource.data.course == resource.data.course &&
+                         request.resource.data.description == resource.data.description &&
+                         request.resource.data.createdAt == resource.data.createdAt &&
+                         request.resource.data.updatedAt is timestamp &&
+                         // Validate optional fields
+                         (!('acceptedAt' in request.resource.data) || 
+                          (request.resource.data.acceptedAt is timestamp)) &&
+                         (!('sessionStartedAt' in request.resource.data) || 
+                          (request.resource.data.sessionStartedAt is timestamp)) &&
+                         (!('completedAt' in request.resource.data) || 
+                          (request.resource.data.completedAt is timestamp))) ||
+                        // Teachers and admins can update any request
+                        isTeacherOrAdmin() ||
                         // Admins can update any request
                         isAdminByEmail()
                       );
       
-      // Allow delete: Users can delete their own pending requests, or admins can delete any
+      // Allow delete: 
+      // - Students can delete their own pending requests
+      // - Teachers/admins can delete any request
       allow delete: if isAuthenticated() && (
+                        // Students can delete their own pending requests
                         (resource.data.studentId == request.auth.uid && 
                          resource.data.status == 'pending') ||
-                        // Allow anyone to delete old pending requests for cleanup
-                        (resource.data.status == 'pending') ||
+                        // Teachers and admins can delete any request
+                        isTeacherOrAdmin() ||
+                        // Admins can delete any request
                         isAdminByEmail()
                       );
     }
     
-    // CompletedSessions collection - Contains completed tutoring session history
+    // CompletedSessions collection - Contains completed tutoring sessions
     match /completedSessions/{sessionId} {
-      // Allow read: Users can read sessions they participated in
+      // Allow read: 
+      // - Students can read sessions they participated in
+      // - Tutors can read sessions they conducted
+      // - Teachers/admins can read all sessions
       allow read: if isAuthenticated() && (
-                      // Users can read sessions they participated in
+                      // Students can read sessions they participated in
                       resource.data.studentId == request.auth.uid ||
-                      // Users can read sessions they tutored
-                      resource.data.tutorId == request.auth.uid ||
+                      // Tutors can read sessions they conducted
+                      (isTutor() && resource.data.tutorId == request.auth.uid) ||
+                      // Teachers and admins can read all sessions
+                      isTeacherOrAdmin() ||
                       // Admins can read all sessions
                       isAdminByEmail()
                     );
       
-      // Allow create: Any authenticated user can create completed sessions
+      // Allow create: 
+      // - Tutors can create sessions for requests they accepted
+      // - Teachers/admins can create any session
       allow create: if isAuthenticated() &&
                       // Validate required fields
-                      request.resource.data.keys().hasAll(['studentId', 'studentName', 'tutorId', 'tutorName', 'course', 'startTime', 'endTime', 'duration', 'completedAt', 'status']) &&
+                      request.resource.data.keys().hasAll(['studentId', 'studentName', 'tutorId', 'tutorName', 'course', 'duration', 'completedAt', 'status']) &&
                       // Validate field types and values
                       request.resource.data.studentId is string &&
                       request.resource.data.studentName is string &&
                       request.resource.data.studentName.size() > 0 &&
                       request.resource.data.studentName.size() <= 100 &&
                       request.resource.data.tutorId is string &&
-                      request.resource.data.tutorId == request.auth.uid &&
                       request.resource.data.tutorName is string &&
                       request.resource.data.tutorName.size() > 0 &&
                       request.resource.data.tutorName.size() <= 100 &&
                       request.resource.data.course is string &&
                       isValidCourse(request.resource.data.course) &&
-                      request.resource.data.startTime is timestamp &&
-                      request.resource.data.endTime is timestamp &&
                       request.resource.data.duration is number &&
                       request.resource.data.duration > 0 &&
                       request.resource.data.completedAt is timestamp &&
@@ -224,18 +272,20 @@ service cloud.firestore {
                         isValidEmail(request.resource.data.studentEmail))) &&
                       (!('tutorEmail' in request.resource.data) || 
                        (request.resource.data.tutorEmail is string && 
-                        isValidEmail(request.resource.data.tutorEmail)));
+                        isValidEmail(request.resource.data.tutorEmail))) &&
+                      // Allow creation by tutors (for their own sessions) or teachers/admins
+                      (isTutor() || isTeacherOrAdmin() || isAdminByEmail());
       
-      // Allow update: Only admins can update completed sessions
-      allow update: if isAdminByEmail();
+      // Allow update: Only teachers/admins can update completed sessions
+      allow update: if isTeacherOrAdmin() || isAdminByEmail();
       
-      // Allow delete: Only admins can delete completed sessions
-      allow delete: if isAdminByEmail();
+      // Allow delete: Only teachers/admins can delete completed sessions
+      allow delete: if isTeacherOrAdmin() || isAdminByEmail();
     }
     
     // Deny all other collections and documents
     match /{document=**} {
-      allow read, write: if false;  
+      allow read, write: if false;
     }
   }
 }

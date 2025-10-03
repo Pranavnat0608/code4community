@@ -44,8 +44,8 @@ service cloud.firestore {
     
     // Users collection - Contains user profile data
     match /users/{userId} {
-      // Allow read access to own user document
-      allow read: if isAuthenticated() && isOwner(userId);
+      // Allow read access to own user document or admins can read all
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdminByEmail());
       
       // Allow create: Only during signup process (email verification not required for initial creation)
       allow create: if isAuthenticated() && 

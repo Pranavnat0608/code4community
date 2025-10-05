@@ -4,6 +4,15 @@ import { securityHeaders, rateLimit } from './middleware/security';
 // Debug function removed for production
 
 export function middleware(request) {
+  // Force HTTPS redirect for production
+  if (process.env.NODE_ENV === 'production' && 
+      request.headers.get('x-forwarded-proto') !== 'https') {
+    return NextResponse.redirect(
+      `https://${request.headers.get('host')}${request.nextUrl.pathname}${request.nextUrl.search}`,
+      301
+    );
+  }
+  
   const response = NextResponse.next();
   
   // Apply security headers

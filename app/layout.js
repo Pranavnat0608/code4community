@@ -23,6 +23,10 @@ const inter = Inter({
 export const metadata = {
   title: "BRHS Utilities",
   description: "Useful Applications for BRHS",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community.net'),
+  alternates: {
+    canonical: '/',
+  },
   icons: {
     icon: [
       { url: '/spartan.png', sizes: '32x32', type: 'image/png' },

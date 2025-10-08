@@ -3,6 +3,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
+// Version: Fixed event parameter naming issues - build timestamp
 // Security headers are configured in next.config.mjs
 
 const geistSans = Geist({

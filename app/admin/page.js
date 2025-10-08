@@ -28,6 +28,13 @@ export default function AdminDashboard() {
   // Router for navigation
   const router = useRouter();
   
+  // Handle redirect for non-admin users
+  useEffect(() => {
+    if (isAuthenticated && userData && !isAdmin) {
+      router.push('/welcome');
+    }
+  }, [isAuthenticated, userData, isAdmin, router]);
+  
   // Additional state
   const [tutors, setTutors] = useState([]);
   const [error, setError] = useState(null);
@@ -183,6 +190,21 @@ export default function AdminDashboard() {
   // Redirect handled by useAuthRedirect hook
   if (!isAuthenticated) {
     return null;
+  }
+
+  // Check if user is admin - redirect to welcome if not
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
+        <DashboardTopBar title="Admin Dashboard" showNavLinks={false} />
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <LoadingSpinner />
+            <p className="mt-4 text-muted-foreground">Redirecting to welcome page...</p>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

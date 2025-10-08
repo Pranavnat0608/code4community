@@ -5,6 +5,7 @@ import { useLoadingState } from "@/hooks/useLoadingState";
 import { QueryBuilder } from "@/utils/firestoreUtils";
 import { handleError } from "@/utils/errorHandlingUtils";
 import { useEffect, useState, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import DashboardTopBar from "../../../components/DashboardTopBar";
 import MathLabSidebar from "../../../components/MathLabSidebar";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -25,6 +26,16 @@ export default function MathLabHistoryPage() {
     isLoading: true,
     isRefreshing: false
   });
+  
+  // Router for navigation
+  const router = useRouter();
+  
+  // Handle redirect for unauthorized users
+  useEffect(() => {
+    if (user && userData && !isAuthorized) {
+      router.push('/welcome');
+    }
+  }, [user, userData, isAuthorized, router]);
   
   // Additional state
   const [sessionHistory, setSessionHistory] = useState([]);
@@ -209,15 +220,15 @@ export default function MathLabHistoryPage() {
     return null; // Will redirect to login
   }
 
-  // Show access denied if not authorized
+  // Show access denied if not authorized - redirect to welcome instead
   if (user && userData && !isAuthorized) {
     return (
       <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
         <DashboardTopBar title="Math Lab History" showNavLinks={false} />
         <div className="container mx-auto px-6 py-8">
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-destructive mb-4">Access Denied</h1>
-            <p className="text-muted-foreground">You don&apos;t have permission to access the Math Lab.</p>
+            <LoadingSpinner />
+            <p className="mt-4 text-muted-foreground">Redirecting to welcome page...</p>
           </div>
         </div>
       </div>

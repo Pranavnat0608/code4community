@@ -2,8 +2,8 @@
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { useUserCache } from "@/hooks/useUserCache";
 import { useLoadingState } from "@/hooks/useLoadingState";
-import { CommonOperations, getDocuments, QueryBuilder } from "@/utils/firestoreUtils";
-import { handleError, withErrorHandling } from "@/utils/errorHandlingUtils";
+import { QueryBuilder } from "@/utils/firestoreUtils";
+import { handleError } from "@/utils/errorHandlingUtils";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import DashboardTopBar from "../../../components/DashboardTopBar";
 import MathLabSidebar from "../../../components/MathLabSidebar";
@@ -18,10 +18,10 @@ export default function MathLabHistoryPage() {
   const { isAuthenticated, isLoading: authLoading, user, userData } = useAuthRedirect('/mathlab/history');
   
   // Use new user cache hook
-  const { cachedUser, refreshCache } = useUserCache();
+  const { cachedUser } = useUserCache();
   
   // Use new loading state hook
-  const { isLoading, setLoading, withLoading, isRefreshing } = useLoadingState({
+  const { isLoading, setLoading, isRefreshing } = useLoadingState({
     isLoading: true,
     isRefreshing: false
   });

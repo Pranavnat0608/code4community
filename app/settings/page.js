@@ -2,20 +2,20 @@
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { useUserCache } from "@/hooks/useUserCache";
 import { useLoadingState } from "@/hooks/useLoadingState";
-import { handleError, withErrorHandling } from "@/utils/errorHandlingUtils";
+import { handleError } from "@/utils/errorHandlingUtils";
 import { useEffect, useState } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import { auth } from "@/firebase";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { validatePassword, sanitizeInput } from "@/utils/validation";
-import { UserCache, CachePerformance } from "@/utils/cache";
+import { UserCache } from "@/utils/cache";
 
 export default function SettingsPage() {
   // Use new authentication redirect hook
   const { isAuthenticated, isLoading: authLoading, user, userData } = useAuthRedirect('/settings');
   
   // Use new user cache hook
-  const { cachedUser, refreshCache } = useUserCache();
+  const { cachedUser } = useUserCache();
   
   // Use new loading state hook
   const { isLoading, setLoading, withLoading, isChangingPassword } = useLoadingState({

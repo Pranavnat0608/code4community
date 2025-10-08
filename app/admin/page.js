@@ -2,14 +2,13 @@
 import { useAuthRedirect } from "@/hooks/useAuthRedirect";
 import { useUserCache } from "@/hooks/useUserCache";
 import { useLoadingState } from "@/hooks/useLoadingState";
-import { CommonOperations, getDocuments, addDocument, deleteDocument } from "@/utils/firestoreUtils";
-import { handleError, withErrorHandling } from "@/utils/errorHandlingUtils";
+import { handleError } from "@/utils/errorHandlingUtils";
 import { useEffect, useState, useCallback } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { doc, collection, query, where, getDocs, addDoc, updateDoc, deleteDoc } from "firebase/firestore";
 import { firestore } from "@/firebase";
-import { UserCache, CachePerformance } from "@/utils/cache";
+import { UserCache } from "@/utils/cache";
 import { isAdminUser } from "@/utils/authorization";
 
 export default function AdminDashboard() {
@@ -17,7 +16,7 @@ export default function AdminDashboard() {
   const { isAuthenticated, isLoading: authLoading, user, userData } = useAuthRedirect('/admin');
   
   // Use new user cache hook
-  const { cachedUser, refreshCache } = useUserCache();
+  const { cachedUser } = useUserCache();
   
   // Use new loading state hook
   const { isLoading, setLoading, withLoading, isAddingTutor } = useLoadingState({

@@ -14,7 +14,7 @@ import { isAdminUser } from "@/utils/authorization";
 
 export default function AdminDashboard() {
   // Use new authentication redirect hook
-  const { isAuthenticated, isLoading: authLoading, user, userData } = useAuthRedirect('/admin');
+  const { isAuthenticated, isLoading: authLoading, user, userData, isEmailVerified } = useAuthRedirect('/admin');
   
   // Use new user cache hook
   const { cachedUser } = useUserCache();

@@ -48,7 +48,14 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <head></head>
+      <head>
+        {/* reCAPTCHA script for Firebase App Check */}
+        <script
+          src="https://www.google.com/recaptcha/api.js?render=explicit"
+          async
+          defer
+        ></script>
+      </head>
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >

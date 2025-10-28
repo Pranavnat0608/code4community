@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { UserCache, CachePerformance } from "@/utils/cache";
 
-export default function DashboardTopBar({ title = "BRHS Utilities", onNavigation, showNavLinks = true }) {
+export default function DashboardTopBar({ title = "Code4Community", onNavigation, showNavLinks = true }) {
   const { userData } = useAuth();
   const router = useRouter();
   const [dropdownOpen, setDropdownOpen] = useState(false);

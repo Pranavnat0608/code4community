@@ -226,18 +226,18 @@ export default function SignupPage() {
             <div className="relative">
               <Image
                 src="/spartan.png"
-                alt="BRHS Utilities Logo"
+                alt="Code4Community Logo"
                 width={40}
                 height={40}
                 className="w-10 h-10 transition-transform duration-200 group-hover:scale-110"
               />
             </div>
             <span className="text-2xl font-bold text-foreground">
-              BRHS Utilities
+              Code4Community
             </span>
           </Link>
           <h1 className="text-3xl font-bold text-foreground mb-2">Create Account</h1>
-          <p className="text-muted-foreground">Join BRHS Utilities to get started</p>
+          <p className="text-muted-foreground">Join Code4Community to get started</p>
         </div>
 
         <div className="card-elevated p-8">

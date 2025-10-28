@@ -30,7 +30,7 @@ export default function SitemapPage() {
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Map</h1>
           <p className="text-gray-600 mb-8">
-            Navigate through all available pages on BRHS Utilities
+            Navigate through all available pages on Code4Community
           </p>
 
           {/* Public Pages */}

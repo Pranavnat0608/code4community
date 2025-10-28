@@ -172,7 +172,7 @@ export default function Welcome() {
     return (
       <div className="min-h-screen bg-background flex flex-col">
         <DashboardTopBar 
-          title="BRHS Utilities" 
+          title="Code4Community" 
           showNavLinks={false}
         />
         <div className="flex-1 px-6 py-4">
@@ -193,7 +193,7 @@ export default function Welcome() {
     <div className="min-h-screen bg-background flex flex-col">
       {/* Use the reusable DashboardTopBar component */}
       <DashboardTopBar 
-        title="BRHS Utilities" 
+        title="Code4Community" 
         showNavLinks={false} // Don't show navigation links on welcome page
       />
 

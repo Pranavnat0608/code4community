@@ -21,14 +21,14 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">1. Acceptance of Terms</h2>
               <p className="text-muted-foreground leading-relaxed">
-                By accessing and using BRHS Utilities (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
+                By accessing and using Code4Community (&quot;the Service&quot;), you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">2. Description of Service</h2>
               <p className="text-muted-foreground leading-relaxed">
-                BRHS Utilities is a web platform operated by the Code4Community Club of Broad Run High School. The Service provides educational applications including the Math Lab tutoring system, which facilitates connections between students seeking tutoring assistance and qualified tutors.
+                Code4Community is a web platform operated by the Code4Community Club of Broad Run High School. The Service provides educational applications including the Math Lab tutoring system, which facilitates connections between students seeking tutoring assistance and qualified tutors.
               </p>
             </section>
 
@@ -100,7 +100,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">7. Intellectual Property</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service and its original content, features, and functionality are owned by BRHS Utilities and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
+                The Service and its original content, features, and functionality are owned by Code4Community and are protected by international copyright, trademark, patent, trade secret, and other intellectual property laws.
               </p>
             </section>
 
@@ -114,14 +114,14 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">9. Disclaimer of Warranties</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. BRHS Utilities expressly disclaims all warranties of any kind, whether express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
+                The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. Code4Community expressly disclaims all warranties of any kind, whether express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
               </p>
             </section>
 
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">10. Limitation of Liability</h2>
               <p className="text-muted-foreground leading-relaxed">
-                In no event shall BRHS Utilities, its officers, directors, employees, or agents be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the Service.
+                In no event shall Code4Community, its officers, directors, employees, or agents be liable for any indirect, incidental, special, consequential, or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from your use of the Service.
               </p>
             </section>
 

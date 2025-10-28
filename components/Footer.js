@@ -21,7 +21,7 @@ export default function Footer() {
           </Link>
         </div>
         <div className="text-center mt-2 text-xs text-muted-foreground">
-          © 2025 BRHS Utilities. All rights reserved.
+          © 2025 Code4Community. All rights reserved.
         </div>
       </div>
     </footer>

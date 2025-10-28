@@ -290,14 +290,14 @@ export default function LoginPage() {
             <div className="relative">
               <Image
                 src="/spartan.png"
-                alt="BRHS Utilities Logo"
+                alt="Code4Community Logo"
                 width={40}
                 height={40}
                 className="w-10 h-10 transition-transform duration-200 group-hover:scale-110"
               />
             </div>
             <span className="text-2xl font-bold text-foreground">
-              BRHS Utilities
+              Code4Community
             </span>
           </Link>
           <h1 className="text-3xl font-bold mb-3">Welcome back</h1>

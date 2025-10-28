@@ -21,8 +21,8 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "BRHS Utilities",
-  description: "Useful Applications for BRHS",
+  title: "Code4Community",
+  description: "At Code4Community, our mission is to help the community around us through computer science. We make tools that make the lives of teachers, volunteers, and others easier.",
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community.net'),
   alternates: {
     canonical: '/',

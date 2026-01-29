@@ -1,9 +1,9 @@
 "use client";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 
 export default function TermsOfService() {
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.title = "Code4Community | Terms of Service";
   }, []);
   

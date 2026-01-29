@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useLayoutEffect } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
 
@@ -8,7 +8,7 @@ export default function Services() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.title = "Code4Community | Services";
   }, []);
 

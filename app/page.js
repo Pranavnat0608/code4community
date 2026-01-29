@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import Image from "next/image";
 import DashboardTopBar from "../components/DashboardTopBar";
 import Footer from "../components/Footer";
@@ -8,7 +8,7 @@ import Footer from "../components/Footer";
 export default function Home() {
   const router = useRouter();
   
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.title = "Code4Community | Home";
   }, []);
   const [projectsCount, setProjectsCount] = useState(0);
@@ -22,7 +22,6 @@ export default function Home() {
 
   // Partner logos - add more as needed
   const partners = [
-    { name: "LCPS", logo: "/lcps.png", alt: "LCPS Logo" },
     { name: "S2Alliance", logo: "/s2alliance_inc_logo.jpeg", alt: "S2Alliance Logo" },
   ];
 

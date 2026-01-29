@@ -1,11 +1,11 @@
 "use client";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import Image from "next/image";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
 
 export default function AboutUs() {
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.title = "Code4Community | About Us";
   }, []);
   

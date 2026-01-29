@@ -1,10 +1,10 @@
 "use client";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
 
 export default function Contact() {
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.title = "Code4Community | Contact";
   }, []);
   

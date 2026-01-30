@@ -24,6 +24,10 @@ export default function Services() {
     router.push('/yearbook-formatting');
   }, [router]);
 
+  const handleSeatingChartClick = useCallback(() => {
+    router.push('/seating-chart');
+  }, [router]);
+
   // Apps data - memoized for performance
   const allApps = useMemo(() => [
     { 
@@ -38,13 +42,19 @@ export default function Services() {
       isActive: true,
       onClick: handleYearbookFormattingClick
     },
+    { 
+      name: "Seating Chart", 
+      description: "Create seating charts and assign students to tables", 
+      isActive: true,
+      onClick: handleSeatingChartClick
+    },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false }
-  ], [handleGradeCalculatorClick, handleYearbookFormattingClick]);
+  ], [handleGradeCalculatorClick, handleYearbookFormattingClick, handleSeatingChartClick]);
 
   // Filter apps based on search query - memoized for performance
   const filteredApps = useMemo(() => 

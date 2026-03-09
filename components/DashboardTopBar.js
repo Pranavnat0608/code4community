@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/utils/AuthContext";
 import { auth, signOut } from "@/firebase";
 import MobileTopBar from "@/components/MobileTopBar";
 
@@ -37,11 +37,13 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
 
   const displayName = user?.displayName || user?.email?.split("@")[0] || "Account";
 
+  const adminEmail = "shail40926@gmail.com";
   const navLinks = [
     { label: "HOME", path: "/" },
     { label: "ABOUT US", path: "/about" },
     { label: "SERVICES", path: "/services" },
     { label: "CONTACT", path: "/contact" },
+    ...(user?.email === adminEmail ? [{ label: "ADMIN", path: "/admin" }] : []),
   ];
 
   return (

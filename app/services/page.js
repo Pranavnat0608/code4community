@@ -291,11 +291,11 @@ export default function Services() {
             Custom software for any organization
           </h1>
           <p className="text-lg text-[#4a4a4a] max-w-xl mx-auto mb-10 leading-relaxed">
-            We build software that fits how you work—dashboards, donor systems, volunteer tools, and full-scale platforms. From idea to launch, we can make grand things happen. <strong className="font-semibold text-[#333]">So you can focus on your mission.</strong>
+            We build software that fits how you work. We make everything from dashboards to donor systems to full-scale platforms. From idea to launch, we can make grand things happen. <strong className="font-semibold text-[#333]">So you can focus on your mission.</strong>
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
-              href="/signup"
+              href="/get-started"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-lg bg-black text-white font-medium hover:bg-[#222] transition-colors"
             >
               Get Started for Free

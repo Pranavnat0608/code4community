@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import DashboardTopBar from '../../components/DashboardTopBar';
+import DashboardTopBar from '../../../components/DashboardTopBar';
 
 export default function SitemapPage() {
   const publicPages = [
@@ -7,8 +7,7 @@ export default function SitemapPage() {
     { path: '/about', title: 'About Us', description: 'Learn about Code4Community' },
     { path: '/services', title: 'Services', description: 'Our available services and tools' },
     { path: '/contact', title: 'Contact', description: 'Get in touch with us' },
-    { path: '/grade-calculator', title: 'Grade Calculator', description: 'Calculate your grades' },
-    { path: '/yearbook-formatting', title: 'Yearbook Formatting', description: 'Format names for yearbook captions' },
+    { path: '/get-started', title: 'Get Started', description: 'Request a tool or get started with us' },
     { path: '/privacy', title: 'Privacy Policy', description: 'Privacy policy' },
     { path: '/terms', title: 'Terms of Service', description: 'Terms of service' },
   ];
@@ -16,7 +15,7 @@ export default function SitemapPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardTopBar />
-      
+
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Site Map</h1>
@@ -52,8 +51,8 @@ export default function SitemapPage() {
                 <p className="text-sm text-gray-600 mb-2">
                   For search engines and crawlers
                 </p>
-                <Link 
-                  href="/sitemap.xml" 
+                <Link
+                  href="/sitemap.xml"
                   className="text-blue-600 hover:text-blue-800 text-sm"
                 >
                   /sitemap.xml
@@ -64,8 +63,8 @@ export default function SitemapPage() {
                 <p className="text-sm text-gray-600 mb-2">
                   Instructions for web crawlers
                 </p>
-                <Link 
-                  href="/robots.txt" 
+                <Link
+                  href="/robots.txt"
                   className="text-blue-600 hover:text-blue-800 text-sm"
                 >
                   /robots.txt

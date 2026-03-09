@@ -4,15 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/utils/AuthContext";
 import { auth, signOut } from "@/firebase";
 
-const NAV_LINKS = [
+const BASE_NAV_LINKS = [
   { label: "HOME", path: "/" },
   { label: "ABOUT US", path: "/about" },
   { label: "SERVICES", path: "/services" },
   { label: "CONTACT", path: "/contact" },
 ];
+const ADMIN_EMAIL = "shail40926@gmail.com";
 
 export default function MobileTopBar({ title = "Code4Community", showNavLinks = true }) {
   const router = useRouter();
@@ -128,7 +129,7 @@ export default function MobileTopBar({ title = "Code4Community", showNavLinks = 
           {/* Nav links */}
           {showNavLinks && (
             <nav className="flex-1 overflow-auto py-2">
-              {NAV_LINKS.map((link) => {
+              {[...BASE_NAV_LINKS, ...(user?.email === ADMIN_EMAIL ? [{ label: "ADMIN", path: "/admin" }] : [])].map((link) => {
                 const isActive = pathname === link.path;
                 return (
                   <div key={link.path} className="border-b border-gray-100">

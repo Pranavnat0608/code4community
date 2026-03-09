@@ -73,10 +73,10 @@ export default function AboutUs() {
               <h2 className="text-2xl font-bold text-foreground mb-4">About Code4Community</h2>
               <div className="text-muted-foreground leading-relaxed space-y-4">
                 <p>
-                  Code4Community was started to build software that organizations and teams could actually use. We build donor management systems, volunteer coordination platforms, program dashboards, intake systems, and custom integrations that nonprofits and organizations rely on.
+                  Code4Community was started as a club at Broad Run High School to build software that teachers and organizations at our school could use. After building hundreds of applications and having great success, we decided to expand to helping create services to benefit our community, free of charge. 
                 </p>
                 <p>
-                  Our goal is to help organizations and the community through technology—building the tools and software they need to work better. We focus on practical, free solutions that make a real difference for teams and users. This site is created and run by our core team; everything you see here is built by us.
+                  Our goal is to help organizations and the community through technology by building the tools and software they need to work better. We focus on practical, free solutions that make a real difference for teams and users.
                 </p>
               </div>
               <Link

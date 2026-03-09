@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community.net';
-  
+
   const routes = [
     // Public pages
     {
@@ -30,13 +30,7 @@ export async function GET() {
       priority: 0.8,
     },
     {
-      url: `${baseUrl}/grade-calculator`,
-      lastModified: new Date(),
-      changeFrequency: 'monthly',
-      priority: 0.8,
-    },
-    {
-      url: `${baseUrl}/yearbook-formatting`,
+      url: `${baseUrl}/get-started`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,
@@ -71,7 +65,6 @@ ${routes
 
   // Validate XML before returning
   try {
-    // Basic XML validation - check for proper structure
     if (!sitemap.includes('<?xml version="1.0" encoding="UTF-8"?>')) {
       throw new Error('Invalid XML declaration');
     }

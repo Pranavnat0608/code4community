@@ -1,6 +1,6 @@
-// Security Middleware
+// Security utilities for proxy (headers, CSRF, rate limiting)
 import { NextResponse } from 'next/server';
-import { validateCSRFToken } from '@/utils/csrf';
+import { validateCSRFToken } from './csrf';
 
 // Rate limiting store (in production, use Redis or similar)
 const rateLimitStore = new Map();
@@ -17,29 +17,29 @@ const checkRateLimit = (ip, isAuthRequest = false) => {
   const now = Date.now();
   const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
   const key = `${ip}:${isAuthRequest ? 'auth' : 'general'}`;
-  
+
   if (!rateLimitStore.has(key)) {
     rateLimitStore.set(key, []);
   }
-  
+
   const requests = rateLimitStore.get(key);
-  
+
   // Remove old requests outside the window
   const validRequests = requests.filter(timestamp => timestamp > windowStart);
   rateLimitStore.set(key, validRequests);
-  
+
   const maxRequests = isAuthRequest ? RATE_LIMIT_CONFIG.authMaxRequests : RATE_LIMIT_CONFIG.maxRequests;
-  
+
   if (validRequests.length >= maxRequests) {
     return false;
   }
-  
+
   // Add current request
   validRequests.push(now);
   return true;
 };
 
-// Security headers middleware
+// Security headers (used by root proxy.js)
 export const securityHeaders = (response) => {
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'SAMEORIGIN');
@@ -49,19 +49,16 @@ export const securityHeaders = (response) => {
   return response;
 };
 
-// CSRF protection middleware
+// CSRF protection wrapper for API handlers
 export const csrfProtection = (handler) => {
   return async (request, context) => {
-    // Skip CSRF for GET requests and public endpoints
     if (request.method === 'GET') {
       return handler(request, context);
     }
 
-    // Get CSRF token from headers
     const csrfToken = request.headers.get('x-csrf-token');
     const sessionToken = request.headers.get('x-session-token');
 
-    // Validate CSRF token
     if (!validateCSRFToken(csrfToken, sessionToken)) {
       return NextResponse.json(
         { error: 'Invalid CSRF token' },
@@ -73,21 +70,21 @@ export const csrfProtection = (handler) => {
   };
 };
 
-// Rate limiting middleware
+// Rate limiting wrapper for API handlers
 export const rateLimit = (handler) => {
   return async (request, context) => {
-    const ip = request.headers.get('x-forwarded-for') || 
-               request.headers.get('x-real-ip') || 
+    const ip = request.headers.get('x-forwarded-for') ||
+               request.headers.get('x-real-ip') ||
                'unknown';
-    
-    const isAuthRequest = request.url.includes('/api/auth') || 
-                         request.url.includes('/login') || 
+
+    const isAuthRequest = request.url.includes('/api/auth') ||
+                         request.url.includes('/login') ||
                          request.url.includes('/signup');
-    
+
     if (!checkRateLimit(ip, isAuthRequest)) {
       return NextResponse.json(
         { error: 'Too many requests' },
-        { 
+        {
           status: 429,
           headers: {
             'Retry-After': '900' // 15 minutes
@@ -100,21 +97,18 @@ export const rateLimit = (handler) => {
   };
 };
 
-// Input sanitization middleware
+// Input sanitization wrapper for API handlers
 export const sanitizeInput = (handler) => {
   return async (request, context) => {
-    // Sanitize request body if it exists
     if (request.method !== 'GET' && request.headers.get('content-type')?.includes('application/json')) {
       try {
         const body = await request.json();
-        // Basic sanitization - remove potential XSS vectors
         const sanitizedBody = JSON.parse(JSON.stringify(body).replace(/[<>]/g, ''));
-        
-        // Create new request with sanitized body
+
         const sanitizedRequest = new Request(request, {
           body: JSON.stringify(sanitizedBody)
         });
-        
+
         return handler(sanitizedRequest, context);
       } catch (error) {
         return NextResponse.json(

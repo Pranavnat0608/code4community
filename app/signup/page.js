@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../utils/AuthContext";
 import { auth, provider, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "../../firebase";
 
 export default function SignupPage() {

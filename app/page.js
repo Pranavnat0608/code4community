@@ -52,11 +52,11 @@ export default function Home() {
             <span className="inline-block w-0.5 h-8 md:h-10 ml-0.5 bg-foreground animate-pulse align-middle" aria-hidden />
           </h1>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-8 max-w-lg">
-            From donor management and volunteer platforms to program dashboards and custom integrations—built for nonprofits and organizations that need to scale.
+            From donor management and volunteer platforms to program dashboards and custom integrations, we build for nonprofits and organizations that need to scale.
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
-              href="/signup"
+              href="/get-started"
               className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
             >
               Start for free
@@ -122,10 +122,10 @@ export default function Home() {
       <section className="border-t border-border bg-muted/20 py-16 md:py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-10">
-            Our Work
+            Some of Our Work
           </h2>
           <p className="text-center text-sm text-muted-foreground mb-8 max-w-xl mx-auto">
-            Tools we build for nonprofits and organizations—donor management, volunteer sign-up, and program reporting.
+            These are tools we have built for nonprofits and organizations that have served hundreds of users, including donor management, volunteer sign-up, and program reporting.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
@@ -133,10 +133,9 @@ export default function Home() {
               { title: "Volunteer portal", desc: "Opportunity listings, sign-up, and shift management.", href: "/demo/volunteer-portal", image: "/volunteer portal.png" },
               { title: "Program reporting", desc: "Outcomes, KPIs, and grant deliverables at a glance.", href: "/demo/reporting", image: "/program reporting.png" },
             ].map((item, i) => (
-              <Link
+              <div
                 key={i}
-                href={item.href}
-                className="group rounded-xl border border-border bg-background overflow-hidden shadow-sm hover:shadow-md transition-shadow block"
+                className="group rounded-xl border border-border bg-background overflow-hidden shadow-sm transition-shadow block cursor-default opacity-90"
               >
                 <div className="aspect-video bg-muted/50 border-b border-border relative overflow-hidden">
                   <Image
@@ -151,7 +150,7 @@ export default function Home() {
                   <h3 className="font-semibold text-foreground text-sm">{item.title}</h3>
                   <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>

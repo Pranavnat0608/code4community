@@ -1,50 +1,24 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState, useMemo, useCallback, useLayoutEffect } from "react";
+import { useState, useMemo, useLayoutEffect } from "react";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
 
 export default function Welcome() {
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   
   useLayoutEffect(() => {
     document.title = "Code4Community | Welcome";
   }, []);
 
-  const handleMathLabClick = useCallback(() => {
-    // Math Lab removed - no longer available
-  }, []);
-
-  const handleGradeCalculatorClick = useCallback(() => {
-    router.push('/grade-calculator');
-  }, [router]);
-
-  const handleYearbookFormattingClick = useCallback(() => {
-    router.push('/yearbook-formatting');
-  }, [router]);
-
   // Apps data - memoized for performance
   const allApps = useMemo(() => [
-    { 
-      name: "Grade Calculator", 
-      description: "Calculate your grades", 
-      isActive: true,
-      onClick: handleGradeCalculatorClick
-    },
-    { 
-      name: "Yearbook Formatting", 
-      description: "Format names for yearbook captions", 
-      isActive: true,
-      onClick: handleYearbookFormattingClick
-    },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false },
     { name: "Coming Soon", description: "More features coming soon", isActive: false }
-  ], [handleGradeCalculatorClick, handleYearbookFormattingClick]);
+  ], []);
 
   // Filter apps based on search query - memoized for performance
   const filteredApps = useMemo(() => 

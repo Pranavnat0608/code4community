@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# swc plugin cache (recreated if needed)
+.swc/
+
 # production
 /build
 

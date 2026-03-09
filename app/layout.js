@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider } from "@/utils/AuthContext";
 
 // Security headers are configured in next.config.mjs
 

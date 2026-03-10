@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
-import { securityHeaders, rateLimit } from './utils/security';
+import { securityHeaders } from './utils/security';
 
 // Debug function removed for production
 
 export function proxy(request) {
+  const hostname = request.nextUrl?.hostname || '';
+  const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+  if (isLocalhost) {
+    return NextResponse.next();
+  }
+
   // Force HTTPS redirect for production
   if (process.env.NODE_ENV === 'production' &&
       request.headers.get('x-forwarded-proto') !== 'https') {
@@ -18,8 +24,9 @@ export function proxy(request) {
   // Apply security headers
   securityHeaders(response);
 
-  // Apply rate limiting
-  const ip = request.headers.get('x-forwarded-for') ||
+  // Apply rate limiting (use first IP in x-forwarded-for as client IP behind proxies)
+  const forwarded = request.headers.get('x-forwarded-for');
+  const ip = (forwarded ? forwarded.split(',')[0].trim() : null) ||
              request.headers.get('x-real-ip') ||
              'unknown';
 
@@ -59,43 +66,29 @@ export function proxy(request) {
 
   // Rate limiting check
 
+  const make429 = (body, retryAfter, limit, reset) => {
+    const res = new NextResponse(body, { status: 429 });
+    securityHeaders(res);
+    res.headers.set('Retry-After', retryAfter);
+    res.headers.set('X-RateLimit-Limit', limit);
+    res.headers.set('X-RateLimit-Remaining', '0');
+    res.headers.set('X-RateLimit-Reset', reset);
+    return res;
+  };
+
   // Check burst protection
   if (burstRequests.length >= maxBurstRequests) {
-    return new Response('Too many requests in short time', {
-      status: 429,
-      headers: {
-        'Retry-After': '60',
-        'X-RateLimit-Limit': maxBurstRequests.toString(),
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': new Date(now + burstWindowMs).toISOString()
-      }
-    });
+    return make429('Too many requests in short time', '60', maxBurstRequests.toString(), new Date(now + burstWindowMs).toISOString());
   }
 
   // Check suspicious activity
   if (suspiciousRequests.length >= maxSuspiciousRequests) {
-    return new Response('Suspicious activity detected', {
-      status: 429,
-      headers: {
-        'Retry-After': '300',
-        'X-RateLimit-Limit': maxSuspiciousRequests.toString(),
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': new Date(now + suspiciousWindowMs).toISOString()
-      }
-    });
+    return make429('Suspicious activity detected', '300', maxSuspiciousRequests.toString(), new Date(now + suspiciousWindowMs).toISOString());
   }
 
   // Check general rate limit
   if (validRequests.length >= maxRequests) {
-    return new Response('Too many requests', {
-      status: 429,
-      headers: {
-        'Retry-After': '900',
-        'X-RateLimit-Limit': maxRequests.toString(),
-        'X-RateLimit-Remaining': '0',
-        'X-RateLimit-Reset': new Date(now + windowMs).toISOString()
-      }
-    });
+    return make429('Too many requests', '900', maxRequests.toString(), new Date(now + windowMs).toISOString());
   }
 
   validRequests.push(now);

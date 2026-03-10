@@ -49,7 +49,7 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
   return (
     <>
       <MobileTopBar title={title} showNavLinks={showNavLinks} />
-      <header className={`hidden md:block bg-background border-b border-border px-6 py-4 relative z-40 ${pathname === '/' || pathname === '/services' ? 'mb-0' : 'mb-6'}`}>
+      <header className={`hidden md:block bg-background border-b border-border px-6 py-4 relative z-40 ${pathname === '/' || pathname === '/services' || pathname === '/admin' ? 'mb-0' : 'mb-6'}`}>
         <div className="container mx-auto">
           <div className="flex items-center justify-between">
             {/* Logo and Title on Left */}
@@ -118,6 +118,13 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
                       </button>
                       {dropdownOpen && (
                         <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-background py-1 shadow-lg z-50">
+                          <Link
+                            href="/settings"
+                            onClick={() => setDropdownOpen(false)}
+                            className="block w-full text-left px-4 py-2 text-sm text-foreground hover:bg-muted focus:outline-none focus:bg-muted"
+                          >
+                            Settings
+                          </Link>
                           <button
                             type="button"
                             onClick={handleSignOut}

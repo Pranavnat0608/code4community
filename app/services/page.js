@@ -295,7 +295,7 @@ export default function Services() {
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link
-              href="/get-started"
+              href="/signup"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-lg bg-black text-white font-medium hover:bg-[#222] transition-colors"
             >
               Get Started for Free

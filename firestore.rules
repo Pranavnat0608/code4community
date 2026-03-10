@@ -10,10 +10,13 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Tool requests (get-started form): anyone can create; only admin can read/list
+    // Tool requests (get-started form): anyone can create; admin can read all; users can read only their own (where email matches)
     match /tool_requests/{id} {
       allow create: if true;
-      allow read, list: if request.auth != null && request.auth.token.email == 'shail40926@gmail.com';
+      allow read, list: if request.auth != null && (
+        request.auth.token.email == 'shail40926@gmail.com' ||
+        resource.data.email == request.auth.token.email
+      );
       allow update, delete: if false;
     }
 

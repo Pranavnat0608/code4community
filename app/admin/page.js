@@ -17,6 +17,7 @@ export default function AdminPage() {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   useLayoutEffect(() => {
     document.title = "Code4Community | Admin";
@@ -90,7 +91,7 @@ export default function AdminPage() {
       <DashboardTopBar title="Code4Community" showNavLinks={true} />
 
       <div className="border-t border-border bg-muted/20 flex-1">
-        <div className="max-w-4xl mx-auto px-6 py-10">
+        <div className="max-w-4xl mx-auto px-6 pt-6 pb-10">
           <h1 className="text-2xl font-bold text-foreground mb-2">Admin dashboard</h1>
           <p className="text-muted-foreground mb-6">Submitted get-started requests</p>
 
@@ -105,38 +106,66 @@ export default function AdminPage() {
           ) : requests.length === 0 ? (
             <p className="text-muted-foreground">No submissions yet.</p>
           ) : (
-            <div className="overflow-x-auto rounded-lg border border-border bg-background">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/50">
-                    <th className="px-4 py-3 font-medium text-foreground">Date</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Name</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Email</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Organization</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Need</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Timeline</th>
-                    <th className="px-4 py-3 font-medium text-foreground">Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {requests.map((r) => (
-                    <tr key={r.id} className="border-b border-border last:border-0">
-                      <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                        {r.submittedAt ? new Date(r.submittedAt).toLocaleString() : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">{r.name || "—"}</td>
-                      <td className="px-4 py-3 text-foreground">
-                        <a href={`mailto:${r.email}`} className="text-primary hover:underline">{r.email || "—"}</a>
-                      </td>
-                      <td className="px-4 py-3 text-foreground">{r.organization || "—"}</td>
-                      <td className="px-4 py-3 text-foreground">{r.need || "—"}</td>
-                      <td className="px-4 py-3 text-foreground">{r.timeline || "—"}</td>
-                      <td className="px-4 py-3 text-foreground max-w-xs truncate" title={r.message || ""}>{r.message || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <ul className="space-y-2">
+              {requests.map((r) => {
+                const isExpanded = expandedId === r.id;
+                return (
+                  <li key={r.id} className="rounded-lg border border-border bg-background overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(isExpanded ? null : r.id)}
+                      className="w-full text-left px-4 py-3 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
+                    >
+                      <span className="font-medium text-foreground">
+                        Request submitted by: {r.name || "—"}
+                      </span>
+                      <svg
+                        className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-0 border-t border-border bg-muted/20">
+                        <dl className="grid gap-2 text-sm">
+                          <div>
+                            <dt className="text-muted-foreground font-medium">Date</dt>
+                            <dd className="text-foreground">{r.submittedAt ? new Date(r.submittedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "—"}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground font-medium">Email</dt>
+                            <dd className="text-foreground">
+                              <a href={`mailto:${r.email}`} className="text-primary hover:underline">{r.email || "—"}</a>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground font-medium">Organization</dt>
+                            <dd className="text-foreground">{r.organization || "—"}</dd>
+                          </div>
+                          {r.need != null && r.need !== "" && (
+                            <div>
+                              <dt className="text-muted-foreground font-medium">Need</dt>
+                              <dd className="text-foreground">{r.need}</dd>
+                            </div>
+                          )}
+                          <div>
+                            <dt className="text-muted-foreground font-medium">Timeline</dt>
+                            <dd className="text-foreground">{r.timeline || "—"}</dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground font-medium">Message</dt>
+                            <dd className="text-foreground whitespace-pre-wrap">{r.message || "—"}</dd>
+                          </div>
+                        </dl>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

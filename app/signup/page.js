@@ -7,7 +7,7 @@ import Image from "next/image";
 import DashboardTopBar from "../../components/DashboardTopBar";
 import Footer from "../../components/Footer";
 import { useAuth } from "../../utils/AuthContext";
-import { auth, provider, createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "../../firebase";
+import { auth, provider, createUserWithEmailAndPassword, signInWithPopup, updateProfile, sendEmailVerification } from "../../firebase";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -27,7 +27,11 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace("/dashboard");
+      if (user.emailVerified) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/verify-email");
+      }
     }
   }, [user, authLoading, router]);
 
@@ -48,7 +52,8 @@ export default function SignupPage() {
       if (name.trim()) {
         await updateProfile(newUser, { displayName: name.trim() });
       }
-      router.push("/dashboard");
+      await sendEmailVerification(newUser);
+      router.replace("/verify-email");
       router.refresh();
     } catch (err) {
       const msg =

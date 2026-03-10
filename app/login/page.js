@@ -24,7 +24,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      router.replace("/dashboard");
+      if (user.emailVerified) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/verify-email");
+      }
     }
   }, [user, authLoading, router]);
 
@@ -33,8 +37,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      router.push("/dashboard");
+      const { user: signedInUser } = await signInWithEmailAndPassword(auth, email, password);
+      if (signedInUser.emailVerified) {
+        router.push("/dashboard");
+      } else {
+        router.push("/verify-email");
+      }
       router.refresh();
     } catch (err) {
       const msg = err.code === "auth/invalid-credential" || err.code === "auth/wrong-password"
@@ -52,8 +60,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      await signInWithPopup(auth, provider);
-      router.push("/dashboard");
+      const { user: signedInUser } = await signInWithPopup(auth, provider);
+      if (signedInUser.emailVerified) {
+        router.push("/dashboard");
+      } else {
+        router.push("/verify-email");
+      }
       router.refresh();
     } catch (err) {
       if (err.code === "auth/popup-closed-by-user") {

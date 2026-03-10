@@ -129,7 +129,7 @@ export default function MobileTopBar({ title = "Code4Community", showNavLinks = 
           {/* Nav links */}
           {showNavLinks && (
             <nav className="flex-1 overflow-auto py-2">
-              {[...BASE_NAV_LINKS, ...(user?.email === ADMIN_EMAIL ? [{ label: "ADMIN", path: "/admin" }] : [])].map((link) => {
+              {[...BASE_NAV_LINKS, ...(user ? [{ label: "SETTINGS", path: "/settings" }] : []), ...(user?.email === ADMIN_EMAIL ? [{ label: "ADMIN", path: "/admin" }] : [])].map((link) => {
                 const isActive = pathname === link.path;
                 return (
                   <div key={link.path} className="border-b border-gray-100">
@@ -145,6 +145,17 @@ export default function MobileTopBar({ title = "Code4Community", showNavLinks = 
                   </div>
                 );
               })}
+              {user && (
+                <div className="border-b border-gray-100">
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="w-full text-left px-4 py-4 text-base font-medium text-black hover:bg-gray-50 transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              )}
             </nav>
           )}
         </div>

@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import DashboardTopBar from "../components/DashboardTopBar";
@@ -22,6 +22,18 @@ const buildItems = [
   { label: "Custom software", icon: "code" },
 ];
 
+// Rotating hero endings: "Your fastest path to tools that [phrase]"
+const heroPhrases = [
+  "help your organization",
+  "scale with your mission",
+  "save you time",
+  "connect your teams",
+  "turn data into impact",
+  "power your programs",
+  "grow your impact",
+  "serve your community",
+];
+
 const buildIcons = {
   globe: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>,
   calc: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
@@ -31,10 +43,58 @@ const buildIcons = {
   code: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>,
 };
 
+const TYPE_MS = 70;
+const DELETE_MS = 45;
+const HOLD_MS = 2200;
+
 export default function Home() {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [displayLength, setDisplayLength] = useState(() => heroPhrases[0].length);
+  const [phase, setPhase] = useState("holding"); // 'holding' | 'deleting' | 'typing'
+
   useLayoutEffect(() => {
     document.title = "Code4Community | Home";
   }, []);
+
+  useEffect(() => {
+    let intervalId = null;
+    let holdTimeoutId = null;
+
+    if (phase === "holding") {
+      holdTimeoutId = setTimeout(() => setPhase("deleting"), HOLD_MS);
+      return () => clearTimeout(holdTimeoutId);
+    }
+
+    if (phase === "deleting") {
+      intervalId = setInterval(() => {
+        setDisplayLength((len) => {
+          if (len <= 1) {
+            setPhase("typing");
+            setPhraseIndex((i) => (i + 1) % heroPhrases.length);
+            return 0;
+          }
+          return len - 1;
+        });
+      }, DELETE_MS);
+      return () => clearInterval(intervalId);
+    }
+
+    if (phase === "typing") {
+      intervalId = setInterval(() => {
+        setDisplayLength((len) => {
+          const full = heroPhrases[(phraseIndex + heroPhrases.length) % heroPhrases.length].length;
+          if (len >= full) {
+            setPhase("holding");
+            return full;
+          }
+          return len + 1;
+        });
+      }, TYPE_MS);
+      return () => clearInterval(intervalId);
+    }
+  }, [phase, phraseIndex]);
+
+  const visibleText = heroPhrases[phraseIndex].slice(0, displayLength);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -44,10 +104,10 @@ export default function Home() {
       <div className="flex-1 flex flex-col lg:flex-row lg:min-h-[calc(100vh-4rem)]">
         {/* Left: Hero */}
         <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:py-16 lg:pl-12 xl:pl-24 max-w-2xl">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight mb-6">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-snug mb-6 overflow-visible">
             Your fastest path to tools that{" "}
-            <span className="bg-gradient-to-r from-violet-500 via-purple-500 to-amber-500 bg-clip-text text-transparent">
-              help your organization
+            <span className="inline-block pb-1.5 overflow-visible bg-gradient-to-r from-violet-500 via-purple-500 to-amber-500 bg-clip-text text-transparent">
+              {visibleText}
             </span>
             <span className="inline-block w-0.5 h-8 md:h-10 ml-0.5 bg-foreground animate-pulse align-middle" aria-hidden />
           </h1>
@@ -56,7 +116,7 @@ export default function Home() {
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
-              href="/get-started"
+              href="/signup"
               className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
             >
               Start for free

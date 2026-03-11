@@ -70,7 +70,7 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
                   {title}
                 </button>
                 <p className="text-xs text-muted-foreground">
-                  YOUR PARTNER IN SOFTWARE SOLUTIONS
+                  Student Developers Building Tools for the Community
                 </p>
               </div>
             </div>

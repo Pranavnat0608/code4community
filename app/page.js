@@ -15,14 +15,14 @@ const partners = [
 // Icons for "what we help you build" grid
 const buildItems = [
   { label: "Web apps", icon: "globe" },
-  { label: "Reporting & dashboards", icon: "calc" },
-  { label: "Dashboards", icon: "chart" },
-  { label: "APIs & integrations", icon: "plug" },
-  { label: "Automation", icon: "bolt" },
+  { label: "Websites for organizations", icon: "building" },
+  { label: "Volunteer management tools", icon: "users" },
+  { label: "Event scheduling systems", icon: "calendar" },
+  { label: "Donation tracking dashboards", icon: "chart" },
   { label: "Custom software", icon: "code" },
 ];
 
-// Rotating hero endings: "Your fastest path to tools that [phrase]"
+// Rotating hero endings: "Free Digital Tools... to [phrase]"
 const heroPhrases = [
   "help your organization",
   "scale with your mission",
@@ -36,10 +36,10 @@ const heroPhrases = [
 
 const buildIcons = {
   globe: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>,
-  calc: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>,
+  building: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.75 21h16.5M3.75 9h16.5m-16.5 6h16.5M2.25 6l9 3.75L20.25 6M2.25 21V6l9 3.75 9-3.75v15" /></svg>,
+  users: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  calendar: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
   chart: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
-  plug: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 011-1h1a2 2 0 100-4H7a1 1 0 01-1-1V4a1 1 0 011-1h3a1 1 0 001-1V4z" /></svg>,
-  bolt: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>,
   code: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>,
 };
 
@@ -105,21 +105,21 @@ export default function Home() {
         {/* Left: Hero */}
         <div className="flex-1 flex flex-col justify-center px-6 py-12 lg:py-16 lg:pl-12 xl:pl-24 max-w-2xl">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-snug mb-6 overflow-visible">
-            Your fastest path to tools that{" "}
+            Free Digital Tools Built by Students for Our Community to{" "}
             <span className="inline-block pb-1.5 overflow-visible bg-gradient-to-r from-violet-500 via-purple-500 to-amber-500 bg-clip-text text-transparent">
               {visibleText}
             </span>
             <span className="inline-block w-0.5 h-8 md:h-10 ml-0.5 bg-foreground animate-pulse align-middle" aria-hidden />
           </h1>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-8 max-w-lg">
-            From donor management and volunteer platforms to program dashboards and custom integrations, we build for nonprofits and organizations that need to scale.
+            Code4Community is a student-led engineering club that builds <strong>custom tools and software</strong> for local nonprofits and small businesses <strong>at no cost.</strong>
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
               href="/signup"
               className="inline-flex items-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
             >
-              Start for free
+              Request a Tool
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </Link>
             <Link
@@ -149,7 +149,7 @@ export default function Home() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-6 text-center">
-              Donor systems, volunteer platforms, program dashboards, custom integrations—whatever your organization needs.
+              Websites, volunteer management tools, event scheduling, donation dashboards, custom software—whatever your organization needs.
             </p>
           </div>
         </div>

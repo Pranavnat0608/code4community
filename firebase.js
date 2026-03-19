@@ -90,11 +90,13 @@ if (!isBuildTime && typeof window !== 'undefined' && process.env.NODE_ENV !== 'd
   console.log('Firebase initialized without App Check (build time)');
 }
 
-// Configure Google provider
-provider.setCustomParameters({
-  prompt: 'select_account',
-  access_type: 'offline'
-});
+// Configure Google provider (guard in case init failed)
+if (provider) {
+  provider.setCustomParameters({
+    prompt: 'select_account',
+    access_type: 'offline'
+  });
+}
 
 // Export Firebase instances with validation
 if (!firestore) {

@@ -52,7 +52,11 @@ export default function SignupPage() {
       if (name.trim()) {
         await updateProfile(newUser, { displayName: name.trim() });
       }
-      await sendEmailVerification(newUser);
+      const continueUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/verify-email` : "";
+      await sendEmailVerification(newUser, {
+        handleCodeInApp: true,
+        ...(continueUrl && { url: continueUrl }),
+      });
       router.replace("/verify-email");
       router.refresh();
     } catch (err) {

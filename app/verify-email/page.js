@@ -37,7 +37,11 @@ export default function VerifyEmailPage() {
     setResending(true);
     setResendSent(false);
     try {
-      await sendEmailVerification(user);
+      const continueUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/verify-email` : "";
+      await sendEmailVerification(user, {
+        handleCodeInApp: true,
+        ...(continueUrl && { url: continueUrl }),
+      });
       setResendSent(true);
     } catch (err) {
       console.error(err);

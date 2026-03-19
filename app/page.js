@@ -158,7 +158,7 @@ export default function Home() {
       {/* Trusted By / Partners */}
       <section className="border-t border-border bg-background py-16 md:py-20 px-6">
         <p className="text-center text-sm font-medium uppercase tracking-wider text-muted-foreground mb-10">
-          Trusted partners of over 50 organizations
+          Some of our trusted partners
         </p>
         <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-3 gap-12 md:gap-16 items-center justify-items-center">
           {partners.map((partner) => (

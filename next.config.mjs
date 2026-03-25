@@ -1,5 +1,32 @@
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// firebase.js imports ./keys.dev.js (gitignored locally). CI/Vercel has no file — alias to tempkeys.dev.js.
+const useKeysDevFallback = !fs.existsSync(path.join(__dirname, "keys.dev.js"));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(useKeysDevFallback
+    ? {
+        webpack(config) {
+          config.resolve.alias = {
+            ...(config.resolve.alias || {}),
+            [path.resolve(__dirname, "keys.dev.js")]: path.resolve(
+              __dirname,
+              "tempkeys.dev.js",
+            ),
+          };
+          return config;
+        },
+        turbopack: {
+          resolveAlias: {
+            "./keys.dev.js": "./tempkeys.dev.js",
+          },
+        },
+      }
+    : {}),
   images: {
     remotePatterns: [
       {

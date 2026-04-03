@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { AP_PRECALC_UNIT1_TOPICS } from "@/data/apPrecalcUnit1Topics";
 import { buildApPrecalc11Session, AP_PRECALC_11_TITLE } from "@/data/apPrecalc11Session";
 import ExponentialGraphSvg from "@/components/study/ExponentialGraphSvg";
@@ -21,15 +22,42 @@ import {
   emptyStudyWeakness,
 } from "@/utils/studyWeakness";
 import {
+  loadStudyMastery,
+  recordStudySkillOutcome,
+  getDueReviewTagKeys,
+  getHighMasteryTagKeys,
+  getLowMasteryTagKeys,
+  emptyStudyMastery,
+  computePerformanceTier,
+} from "@/utils/studyMastery";
+import {
   normalizeStudyTopicKey,
   shouldSkipTopicWeaknessKey,
 } from "@/utils/studyTopicKey";
-import { normalizeSkillTag } from "@/utils/studyTags";
+import { normalizeSkillTag, skillTagLabel } from "@/utils/studyTags";
 import { recordStudyQuestionResult, mergeStudyStatsTime } from "@/utils/studyStatsFirestore";
+import {
+  loadStudyNoteSets,
+  createStudyNoteSet,
+  updateStudyNoteSet,
+  deriveNoteSetName,
+  saveNoteSetSessionResume,
+  clearNoteSetSessionResume,
+  deleteStudyNoteSet,
+} from "@/utils/studyNoteSets";
 import { auth } from "@/firebase";
 import { DEMO_STUDY_QUIZ } from "@/data/studyDemoQuiz";
+import { DEMO_NOTE_SETS } from "@/data/studyDemoNoteSets";
+import StudySessionProgressHeader from "@/components/study/StudySessionProgressHeader";
 
 const MAX_CHARS = 120_000;
+
+/** Firestore `sessionResume.v` — bump if snapshot shape changes */
+const SESSION_RESUME_VERSION = 1;
+
+const STUDY_NOTE_SETS_DEMO =
+  typeof process !== "undefined" &&
+  process.env.NEXT_PUBLIC_STUDY_DEMO === "1";
 
 /**
  * Questions per AI request (session continues until user ends it).
@@ -55,6 +83,74 @@ function optionLetter(index) {
 function stripLeadingQuestionNumber(text) {
   if (typeof text !== "string") return text;
   return text.replace(/^\s*\d+[\.\)]\s*/, "").trim();
+}
+
+function difficultyPillLabel(d) {
+  const x = typeof d === "string" ? d.toLowerCase() : "";
+  if (x === "easy") return "Easy";
+  if (x === "hard") return "Hard";
+  return "Medium";
+}
+
+function cognitivePillLabel(c) {
+  const x = typeof c === "string" ? c.toLowerCase() : "";
+  if (x === "recall") return "Recall";
+  if (x === "analysis") return "Analysis";
+  return "Application";
+}
+
+function hasStructuredStimulus(q) {
+  return typeof q?.stimulusQuote === "string" && q.stimulusQuote.trim().length > 0;
+}
+
+/**
+ * AP-style layout: intro line → blockquote passage → right-aligned citation → stem below.
+ * Falls back to a single block when `question` carries the full text (legacy / no stimulus fields).
+ */
+function QuestionPromptBlock({ q, questionIndex, variant = "playing" }) {
+  const stem = typeof q.question === "string" ? stripLeadingQuestionNumber(q.question) : "";
+  if (hasStructuredStimulus(q)) {
+    const cite =
+      typeof q.stimulusCitation === "string" && q.stimulusCitation.trim()
+        ? q.stimulusCitation.trim()
+        : null;
+    return (
+      <div className="space-y-3">
+        <p className="font-semibold text-sm text-foreground font-serif">
+          Refer to the passage below.
+        </p>
+        <blockquote className="font-serif text-sm leading-relaxed border-l-[3px] border-foreground/20 pl-4 py-3 bg-muted/40 rounded-r-md text-foreground">
+          {q.stimulusQuote.trim()}
+        </blockquote>
+        {cite && (
+          <p className="text-xs sm:text-sm text-muted-foreground text-right leading-snug">{cite}</p>
+        )}
+        <p
+          className={
+            variant === "playing"
+              ? "text-foreground font-medium leading-relaxed pt-3 border-t border-border/80"
+              : "text-sm font-medium text-foreground leading-relaxed pt-3 border-t border-border/80"
+          }
+        >
+          {stem}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <p
+      className={
+        variant === "playing"
+          ? "text-foreground font-medium mb-4"
+          : "text-sm font-medium text-foreground leading-relaxed"
+      }
+    >
+      {variant === "playing" && (
+        <span className="text-muted-foreground mr-2 tabular-nums">{questionIndex + 1}.</span>
+      )}
+      {stem}
+    </p>
+  );
 }
 
 /**
@@ -121,6 +217,14 @@ export default function StudyQuiz({ user }) {
   /** Local-only preview: no Gemini, no Firestore stats */
   const [isDemoSession, setIsDemoSession] = useState(false);
   const isDemoSessionRef = useRef(false);
+  /** Firestore note sets + optional demo cards */
+  const [noteSets, setNoteSets] = useState([]);
+  const [noteSetsLoading, setNoteSetsLoading] = useState(false);
+  /** When set, the next successful generate updates this doc; cleared when user edits notes / resets */
+  const [activeNoteSetId, setActiveNoteSetId] = useState(null);
+  /** Modal: inspect prompt + weakness / strengths for a note set */
+  const [inspectNoteSet, setInspectNoteSet] = useState(null);
+  const [deletingNoteSet, setDeletingNoteSet] = useState(false);
   /** @type {Record<number, number | null>} questionIndex -> selected option index */
   const [selections, setSelections] = useState({});
   /** Whether user pressed "Check" or "I'm stuck" on that question (shows explanation) */
@@ -132,6 +236,8 @@ export default function StudyQuiz({ user }) {
   const [quizPhase, setQuizPhase] = useState("playing");
   /** Miss counts per skill tag (Firestore + local); drives adaptive generation */
   const [studyWeakness, setStudyWeakness] = useState(emptyStudyWeakness);
+  /** Per-skill mastery + spaced-repetition due times */
+  const [studyMastery, setStudyMastery] = useState(emptyStudyMastery);
   /** Topic coverage balancing for this session (AI-only) */
   const [topicCounts, setTopicCounts] = useState({});
   const [recentTopics, setRecentTopics] = useState([]);
@@ -142,12 +248,37 @@ export default function StudyQuiz({ user }) {
   /** In-flight background fetch for the next batch (continuous practice) */
   const prefetchPromiseRef = useRef(null);
   const prefetchInFlightRef = useRef(false);
+  /**
+   * Only one automatic prefetch per study session. Without this, each time the buffer grows
+   * the user can hit "≤2 questions left" again (e.g. index 7 of 9) and trigger another
+   * generate+refine while still on an early question — 3+ POSTs for one notes upload.
+   * More questions after that load via goNext → fetchMoreQuestions on the last buffer item.
+   */
+  const sessionAutoPrefetchUsedRef = useRef(false);
+  /** Last ~14 AI MCQ outcomes (true = correct) — drives adaptive difficulty hint */
+  const recentAiOutcomesRef = useRef([]);
+  /**
+   * Adaptive fields for /api/study/generate-quiz — kept in refs so `fetchQuestionBatch` identity
+   * does not change every answer. Otherwise the prefetch effect re-runs on each miss and can
+   * schedule redundant requests (each route call = 2 Gemini: generate + refine).
+   */
+  const studyWeaknessRef = useRef(studyWeakness);
+  const topicCountsRef = useRef(topicCounts);
+  const recentTopicsRef = useRef(recentTopics);
+  studyWeaknessRef.current = studyWeakness;
+  topicCountsRef.current = topicCounts;
+  recentTopicsRef.current = recentTopics;
 
   /** Larger notes → larger batches (fewer API calls; same notes re-sent each call). See getSessionBatchSize. */
   const sessionBatchSize = useMemo(
     () => getSessionBatchSize(notes.length),
     [notes.length]
   );
+
+  const displayNoteSets = useMemo(() => {
+    const demo = STUDY_NOTE_SETS_DEMO ? DEMO_NOTE_SETS : [];
+    return [...demo, ...noteSets];
+  }, [noteSets]);
 
   useEffect(() => {
     quizRef.current = quiz;
@@ -157,8 +288,30 @@ export default function StudyQuiz({ user }) {
     if (!user) return;
     let cancelled = false;
     (async () => {
-      const w = await loadStudyWeakness(user);
-      if (!cancelled) setStudyWeakness(w);
+      const [w, m] = await Promise.all([loadStudyWeakness(user), loadStudyMastery(user)]);
+      if (!cancelled) {
+        setStudyWeakness(w);
+        setStudyMastery(m);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    setNoteSetsLoading(true);
+    (async () => {
+      try {
+        const list = await loadStudyNoteSets(user);
+        if (!cancelled) setNoteSets(list);
+      } catch (e) {
+        console.error("loadStudyNoteSets:", e);
+      } finally {
+        if (!cancelled) setNoteSetsLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -200,6 +353,7 @@ export default function StudyQuiz({ user }) {
   }, []);
 
   const resetQuiz = useCallback(() => {
+    const noteSetIdToClear = activeNoteSetId;
     flushSessionTime();
     setQuiz(null);
     setSelections({});
@@ -221,7 +375,16 @@ export default function StudyQuiz({ user }) {
     setError(null);
     setLoadingMore(false);
     setIsDemoSession(false);
-  }, [flushSessionTime]);
+    setActiveNoteSetId(null);
+    setInspectNoteSet(null);
+    recentAiOutcomesRef.current = [];
+    sessionAutoPrefetchUsedRef.current = false;
+    prefetchInFlightRef.current = false;
+    prefetchPromiseRef.current = null;
+    if (noteSetIdToClear && user) {
+      void clearNoteSetSessionResume(user, noteSetIdToClear);
+    }
+  }, [flushSessionTime, user, activeNoteSetId]);
 
   useEffect(() => {
     setPmIntervalAnswer("");
@@ -238,6 +401,7 @@ export default function StudyQuiz({ user }) {
     reader.onload = () => {
       const text = typeof reader.result === "string" ? reader.result : "";
       setNotes(text.slice(0, MAX_CHARS));
+      setActiveNoteSetId(null);
       setError(null);
     };
     reader.onerror = () => setError("Could not read that file.");
@@ -304,45 +468,93 @@ export default function StudyQuiz({ user }) {
     setPmMcqSelections((prev) => ({ ...prev, [pmIndex]: optionIndex }));
   };
 
-  const fetchQuestionBatch = useCallback(async () => {
-    if (!notes.trim() || subject === "math") return null;
-    const idToken = await user.getIdToken();
-    const res = await fetch("/api/study/generate-quiz", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
-      body: JSON.stringify({
-        notes: notes.trim(),
-        numQuestions: sessionBatchSize,
-        subject,
-        weakTags: getTopWeakTagKeys(studyWeakness, subject),
-        weakTopics: getTopWeakTopicKeys(studyWeakness, subject),
-        topicCoverage: buildTopicCoverageHints(topicCounts, recentTopics),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.error || `Request failed (${res.status})`);
-    }
-    if (!data.quiz?.questions?.length) {
-      throw new Error("No questions returned. Try again.");
-    }
-    return data.quiz;
-  }, [user, notes, subject, studyWeakness, topicCounts, recentTopics, sessionBatchSize]);
+  const fetchQuestionBatch = useCallback(
+    async (overrides = {}) => {
+      const noteText = String(overrides.notes ?? notes).trim();
+      const subj = overrides.subject ?? subject;
+      const batchSize = getSessionBatchSize(noteText.length);
+      if (!noteText || subj === "math") return null;
+      const idToken = await user.getIdToken();
+      const res = await fetch("/api/study/generate-quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          notes: noteText,
+          numQuestions: batchSize,
+          subject: subj,
+          weakTags: getTopWeakTagKeys(studyWeaknessRef.current, subj),
+          weakTopics: getTopWeakTopicKeys(studyWeaknessRef.current, subj),
+          topicCoverage: buildTopicCoverageHints(
+            topicCountsRef.current,
+            recentTopicsRef.current
+          ),
+          performanceTier: computePerformanceTier(recentAiOutcomesRef.current),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      if (!data.quiz?.questions?.length) {
+        throw new Error("No questions returned. Try again.");
+      }
+      return data.quiz;
+    },
+    [user, notes, subject]
+  );
+
+  const persistNoteSetAfterGenerate = useCallback(
+    /** @returns {Promise<string | null>} Firestore note set id */
+    async (noteText, subj, persistSetId) => {
+      if (!user || isDemoSession) return null;
+      try {
+        if (persistSetId) {
+          await updateStudyNoteSet(user, persistSetId, {
+            notes: noteText,
+            subject: subj,
+            name: deriveNoteSetName(noteText),
+          });
+          setActiveNoteSetId(persistSetId);
+          const list = await loadStudyNoteSets(user);
+          setNoteSets(list);
+          return persistSetId;
+        }
+        const id = await createStudyNoteSet(user, {
+          name: deriveNoteSetName(noteText),
+          notes: noteText,
+          subject: subj,
+        });
+        setActiveNoteSetId(id);
+        const list = await loadStudyNoteSets(user);
+        setNoteSets(list);
+        return id;
+      } catch (e) {
+        console.error("persistNoteSetAfterGenerate:", e);
+        return null;
+      }
+    },
+    [user, isDemoSession]
+  );
 
   /**
    * Prefetch the next batch in the background before the current buffer runs out.
-   * Threshold scales with batch size (~half the batch remaining).
+   * Each POST runs 2 Gemini calls (generate + refine on the server). We only prefetch when
+   * at most 2 questions are left in the buffer — enough lead time without firing as early
+   * as "half the batch remaining" (which caused extra API usage on short sessions).
+   * At most once per session (see sessionAutoPrefetchUsedRef) so we never chain prefetches
+   * as the user moves through an expanded buffer.
    */
   useEffect(() => {
     if (!quiz?.questions?.length || quizPhase !== "playing") return;
     if (isDemoSession) return;
     if (subject === "math") return;
     if (!notes.trim()) return;
+    if (sessionAutoPrefetchUsedRef.current) return;
     const remaining = quiz.questions.length - currentIndex;
-    const prefetchThreshold = Math.max(2, Math.ceil(sessionBatchSize / 2));
+    const prefetchThreshold = 2;
     if (remaining > prefetchThreshold) return;
     if (prefetchInFlightRef.current) return;
 
@@ -364,14 +576,20 @@ export default function StudyQuiz({ user }) {
       } finally {
         prefetchInFlightRef.current = false;
         prefetchPromiseRef.current = null;
+        sessionAutoPrefetchUsedRef.current = true;
       }
     })();
     prefetchPromiseRef.current = run;
   }, [quiz, currentIndex, quizPhase, subject, notes, fetchQuestionBatch, sessionBatchSize, isDemoSession]);
 
-  const generate = async () => {
-    if (subject === "math") return;
-    if (!notes.trim()) {
+  const generate = async (opts = {}) => {
+    const noteText = String(opts.notesOverride ?? notes).trim();
+    const subj = opts.subjectOverride ?? subject;
+    const persistSetId = Object.prototype.hasOwnProperty.call(opts, "setIdOverride")
+      ? opts.setIdOverride
+      : activeNoteSetId;
+    if (subj === "math") return;
+    if (!noteText) {
       setError("Paste your notes or upload a .txt file first.");
       return;
     }
@@ -385,15 +603,138 @@ export default function StudyQuiz({ user }) {
     setRecentTopics([]);
     setCurrentIndex(0);
     setQuizPhase("playing");
+    recentAiOutcomesRef.current = [];
+    sessionAutoPrefetchUsedRef.current = false;
+    prefetchInFlightRef.current = false;
+    prefetchPromiseRef.current = null;
     try {
-      const batch = await fetchQuestionBatch();
-      if (batch) setQuiz(batch);
+      const batch = await fetchQuestionBatch({ notes: noteText, subject: subj });
+      if (batch) {
+        setQuiz(batch);
+        if (!opts.skipNoteSetPersist) {
+          const noteSetId = await persistNoteSetAfterGenerate(
+            noteText,
+            subj,
+            persistSetId
+          );
+          if (noteSetId) {
+            await clearNoteSetSessionResume(user, noteSetId);
+          }
+        }
+      }
     } catch (err) {
       console.error(err);
       setError(err?.message || "Network error. Try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteInspectNoteSet = useCallback(async () => {
+    const n = inspectNoteSet;
+    if (!n || n.isDemo || !user) return;
+    if (
+      !window.confirm(
+        `Delete "${n.name}"? This removes the saved note set and any saved progress. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeletingNoteSet(true);
+    setError(null);
+    try {
+      await deleteStudyNoteSet(user, n.id);
+      if (activeNoteSetId === n.id) setActiveNoteSetId(null);
+      const list = await loadStudyNoteSets(user);
+      setNoteSets(list);
+      setInspectNoteSet(null);
+    } catch (e) {
+      console.error("deleteStudyNoteSet:", e);
+      setError("Could not delete note set. Try again.");
+    } finally {
+      setDeletingNoteSet(false);
+    }
+  }, [inspectNoteSet, user, activeNoteSetId]);
+
+  const continueNoteSet = async (set) => {
+    setError(null);
+    const sub = set.subject === "science" ? "science" : "history";
+    const noteText = set.notes || "";
+    setNotes(noteText);
+    setSubject(sub);
+
+    if (set.isDemo) {
+      void generate({
+        notesOverride: noteText,
+        subjectOverride: sub,
+        setIdOverride: null,
+        skipNoteSetPersist: true,
+      });
+      return;
+    }
+
+    const resume = set.sessionResume;
+    const notesPrefix = noteText.trim().slice(0, 120);
+    const structOk =
+      resume &&
+      resume.v === SESSION_RESUME_VERSION &&
+      resume.quiz?.questions?.length > 0 &&
+      typeof resume.currentIndex === "number" &&
+      resume.currentIndex >= 0 &&
+      resume.currentIndex < resume.quiz.questions.length;
+    const notesMatch =
+      structOk &&
+      (!resume.notesPrefix || resume.notesPrefix === notesPrefix);
+
+    if (structOk && notesMatch) {
+      setLoading(true);
+      setError(null);
+      try {
+        setQuiz(resume.quiz);
+        setCurrentIndex(resume.currentIndex);
+        setSelections(resume.selections && typeof resume.selections === "object" ? resume.selections : {});
+        setCheckedSteps(
+          resume.checkedSteps && typeof resume.checkedSteps === "object"
+            ? resume.checkedSteps
+            : {}
+        );
+        setStuckSteps(
+          resume.stuckSteps && typeof resume.stuckSteps === "object" ? resume.stuckSteps : {}
+        );
+        setTopicCounts(
+          resume.topicCounts && typeof resume.topicCounts === "object" ? resume.topicCounts : {}
+        );
+        setRecentTopics(Array.isArray(resume.recentTopics) ? resume.recentTopics : []);
+        recentAiOutcomesRef.current = Array.isArray(resume.recentAiOutcomes)
+          ? resume.recentAiOutcomes.filter((x) => typeof x === "boolean")
+          : [];
+        sessionAutoPrefetchUsedRef.current = Boolean(resume.sessionAutoPrefetchUsed);
+        prefetchInFlightRef.current = false;
+        prefetchPromiseRef.current = null;
+        setQuizPhase("playing");
+        setActiveNoteSetId(set.id);
+        setIsDemoSession(false);
+      } catch (e) {
+        console.error("continueNoteSet resume:", e);
+        setError("Could not restore session. Starting a new session…");
+        void generate({
+          notesOverride: noteText,
+          subjectOverride: sub,
+          setIdOverride: set.id,
+          skipNoteSetPersist: false,
+        });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    void generate({
+      notesOverride: noteText,
+      subjectOverride: sub,
+      setIdOverride: set.id,
+      skipNoteSetPersist: false,
+    });
   };
 
   const fetchMoreQuestions = async () => {
@@ -421,6 +762,30 @@ export default function StudyQuiz({ user }) {
   };
 
   const endSession = () => {
+    if (activeNoteSetId && !isDemoSession && quiz && user) {
+      void (async () => {
+        try {
+          const snapshot = {
+            v: SESSION_RESUME_VERSION,
+            quiz,
+            currentIndex,
+            selections,
+            checkedSteps,
+            stuckSteps,
+            topicCounts,
+            recentTopics,
+            recentAiOutcomes: [...recentAiOutcomesRef.current],
+            sessionAutoPrefetchUsed: sessionAutoPrefetchUsedRef.current,
+            notesPrefix: notes.trim().slice(0, 120),
+          };
+          await saveNoteSetSessionResume(user, activeNoteSetId, snapshot);
+          const list = await loadStudyNoteSets(user);
+          setNoteSets(list);
+        } catch (e) {
+          console.error("endSession save resume:", e);
+        }
+      })();
+    }
     setQuizPhase("results");
   };
 
@@ -439,6 +804,7 @@ export default function StudyQuiz({ user }) {
     setRecentTopics([]);
     setCurrentIndex(0);
     setQuizPhase("playing");
+    sessionAutoPrefetchUsedRef.current = false;
   };
 
   const goNext = async () => {
@@ -504,21 +870,32 @@ export default function StudyQuiz({ user }) {
     setCheckedSteps((prev) => ({ ...prev, [currentIndex]: true }));
     if (!isDemoSession) {
       void recordStudyQuestionResult(user, wrong ? "wrong" : "correct");
-      if (wrong && (subject === "history" || subject === "science")) {
+      if (subject === "history" || subject === "science") {
+        recentAiOutcomesRef.current.push(!wrong);
+        if (recentAiOutcomesRef.current.length > 14) {
+          recentAiOutcomesRef.current.shift();
+        }
         const tag = normalizeSkillTag(subject, q.skillTag);
-        const topicKey = normalizeStudyTopicKey(q.topicLabel);
-        setStudyWeakness((prev) => {
-          const sub = subject === "science" ? "science" : "history";
-          const tags = { ...(prev[sub]?.tags || {}) };
-          tags[tag] = (tags[tag] || 0) + 1;
-          const topics = { ...(prev[sub]?.topics || {}) };
-          if (!shouldSkipTopicWeaknessKey(topicKey)) {
-            topics[topicKey] = (topics[topicKey] || 0) + 1;
-          }
-          return { ...prev, [sub]: { ...prev[sub], tags, topics } };
-        });
-        void recordStudyMiss(user, subject, tag);
-        void recordStudyTopicMiss(user, subject, q.topicLabel);
+        void recordStudySkillOutcome(user, subject, tag, !wrong);
+        void (async () => {
+          const m = await loadStudyMastery(user);
+          setStudyMastery(m);
+        })();
+        if (wrong) {
+          const topicKey = normalizeStudyTopicKey(q.topicLabel);
+          setStudyWeakness((prev) => {
+            const sub = subject === "science" ? "science" : "history";
+            const tags = { ...(prev[sub]?.tags || {}) };
+            tags[tag] = (tags[tag] || 0) + 1;
+            const topics = { ...(prev[sub]?.topics || {}) };
+            if (!shouldSkipTopicWeaknessKey(topicKey)) {
+              topics[topicKey] = (topics[topicKey] || 0) + 1;
+            }
+            return { ...prev, [sub]: { ...prev[sub], tags, topics } };
+          });
+          void recordStudyMiss(user, subject, tag);
+          void recordStudyTopicMiss(user, subject, q.topicLabel);
+        }
       }
     }
   };
@@ -586,150 +963,243 @@ export default function StudyQuiz({ user }) {
 
   return (
     <div className="space-y-8 w-full min-w-0 max-w-full">
-      {!quiz && !pmTopic && (
-        <div className="rounded-xl border border-border bg-background shadow-sm p-6 md:p-8 space-y-6">
-          <div>
-            <p className="text-sm font-medium text-foreground mb-3">Choose a subject</p>
-            <div className="grid grid-cols-2 gap-3 max-w-lg">
-              {(
-                [
-                  { id: "math", label: "Math", hint: "AP Precalc · built-in" },
-                  { id: "science", label: "Science", hint: "AI from your notes" },
-                  { id: "history", label: "History", hint: "Social studies" },
-                  { id: "soon", label: "Coming soon", hint: "More subjects", disabled: true },
-                ]
-              ).map((tile) => {
-                const isSelected = !tile.disabled && subject === tile.id;
-                return (
+      {loading && !quiz && !pmTopic && (
+        <div
+          className="rounded-xl border border-border bg-background shadow-sm min-h-[min(70vh,520px)] flex flex-col items-center justify-center px-6 py-16"
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <div
+            className="h-12 w-12 rounded-full border-4 border-muted border-t-primary animate-spin"
+            aria-hidden
+          />
+          <p className="mt-6 text-sm font-medium text-foreground">Building your quiz…</p>
+          <p className="mt-1.5 text-xs text-muted-foreground text-center max-w-xs">
+            Hang tight — this usually takes a few seconds.
+          </p>
+        </div>
+      )}
+      {!quiz && !pmTopic && !loading && (
+        <div className="rounded-xl border border-border bg-background shadow-sm p-6 md:p-8">
+          <div className="flex flex-col lg:flex-row lg:items-stretch gap-8 lg:gap-0">
+            <div className="flex-1 min-w-0 space-y-6 lg:pr-10">
+              <div>
+                <p className="text-sm font-medium text-foreground mb-3">Choose a subject</p>
+                <div className="grid grid-cols-2 gap-3 max-w-lg">
+                  {(
+                    [
+                      { id: "math", label: "Math", hint: "AP Precalc · built-in" },
+                      { id: "science", label: "Science", hint: "AI from your notes" },
+                      { id: "history", label: "History", hint: "Social studies" },
+                      { id: "soon", label: "Coming soon", hint: "More subjects", disabled: true },
+                    ]
+                  ).map((tile) => {
+                    const isSelected = !tile.disabled && subject === tile.id;
+                    return (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        disabled={tile.disabled}
+                        onClick={() => {
+                          if (tile.disabled) return;
+                          if (tile.id === "science") setSubject("science");
+                          else if (tile.id === "math") setSubject("math");
+                          else setSubject("history");
+                          setError(null);
+                        }}
+                        className={[
+                          "rounded-xl border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                          tile.disabled
+                            ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed opacity-80"
+                            : isSelected
+                              ? "border-primary bg-primary/10 shadow-sm"
+                              : "border-border bg-background hover:bg-muted/40 hover:border-muted-foreground/30",
+                        ].join(" ")}
+                      >
+                        <span
+                          className={`block font-semibold ${tile.disabled ? "text-muted-foreground" : "text-foreground"}`}
+                        >
+                          {tile.label}
+                        </span>
+                        <span className="mt-1 block text-xs text-muted-foreground leading-snug">{tile.hint}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">Try the flow without AI</p>
+                  <p className="text-xs text-muted-foreground">
+                    Three static questions — no Gemini, nothing saved to your stats.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={startDemoSession}
+                  className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-border bg-background font-medium rounded-lg hover:bg-muted/60 transition-colors text-sm"
+                >
+                  Start demo
+                </button>
+              </div>
+
+              <div className="flex flex-col lg:flex-row lg:items-end gap-4 flex-wrap">
+                {subject === "math" && (
+                  <div className="flex-1 min-w-[min(100%,18rem)]">
+                    <label htmlFor="study-math-topic" className="block text-sm font-medium text-foreground mb-1.5">
+                      Topic (Unit 1)
+                    </label>
+                    <select
+                      id="study-math-topic"
+                      value={mathTopicId}
+                      onChange={(e) => {
+                        setMathTopicId(e.target.value);
+                        setError(null);
+                      }}
+                      className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                    >
+                      {AP_PRECALC_UNIT1_TOPICS.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.id} {t.title}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      Built-in practice (no AI). More topics coming soon.
+                    </p>
+                  </div>
+                )}
+
+                {subject === "math" ? (
                   <button
-                    key={tile.id}
                     type="button"
-                    disabled={tile.disabled}
-                    onClick={() => {
-                      if (tile.disabled) return;
-                      if (tile.id === "science") setSubject("science");
-                      else if (tile.id === "math") setSubject("math");
-                      else setSubject("history");
+                    onClick={startMathPractice}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
+                  >
+                    Start practice
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={generate}
+                    disabled={loading || !notes.trim()}
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? "Starting session…" : "Start practice session"}
+                  </button>
+                )}
+              </div>
+
+              {subject !== "math" && (
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground mb-1">Your notes</h2>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Paste text or upload a <strong>.txt</strong> file (up to ~10 pages). Notes are sent only to
+                    generate questions during your session.
+                  </p>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => {
+                      setNotes(e.target.value.slice(0, MAX_CHARS));
+                      setActiveNoteSetId(null);
                       setError(null);
                     }}
-                    className={[
-                      "rounded-xl border p-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                      tile.disabled
-                        ? "border-border bg-muted/20 text-muted-foreground cursor-not-allowed opacity-80"
-                        : isSelected
-                          ? "border-primary bg-primary/10 shadow-sm"
-                          : "border-border bg-background hover:bg-muted/40 hover:border-muted-foreground/30",
-                    ].join(" ")}
-                  >
-                    <span
-                      className={`block font-semibold ${tile.disabled ? "text-muted-foreground" : "text-foreground"}`}
-                    >
-                      {tile.label}
+                    rows={12}
+                    placeholder="Paste your class notes, outline, or study sheet here…"
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y font-mono text-sm"
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-xs text-muted-foreground">
+                    <span>
+                      {notes.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} characters
                     </span>
-                    <span className="mt-1 block text-xs text-muted-foreground leading-snug">{tile.hint}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+                    <label className="cursor-pointer text-primary hover:underline font-medium">
+                      Upload .txt
+                      <input type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} />
+                    </label>
+                  </div>
+                </div>
+              )}
 
-          <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium text-foreground">Try the flow without AI</p>
-              <p className="text-xs text-muted-foreground">
-                Three static questions — no Gemini, nothing saved to your stats.
-              </p>
+              {error && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-sm">
+                  {error}
+                </div>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={startDemoSession}
-              className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-2.5 border border-border bg-background font-medium rounded-lg hover:bg-muted/60 transition-colors text-sm"
-            >
-              Start demo
-            </button>
-          </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-end gap-4 flex-wrap">
-            {subject === "math" && (
-              <div className="flex-1 min-w-[min(100%,18rem)]">
-                <label htmlFor="study-math-topic" className="block text-sm font-medium text-foreground mb-1.5">
-                  Topic (Unit 1)
-                </label>
-                <select
-                  id="study-math-topic"
-                  value={mathTopicId}
-                  onChange={(e) => {
-                    setMathTopicId(e.target.value);
-                    setError(null);
-                  }}
-                  className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                >
-                  {AP_PRECALC_UNIT1_TOPICS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.id} {t.title}
-                    </option>
+            {(noteSetsLoading || displayNoteSets.length > 0) && (
+              <>
+                <div
+                  className="hidden lg:block w-px shrink-0 bg-black dark:bg-neutral-500"
+                  aria-hidden
+                />
+                <aside className="w-full lg:w-[min(100%,18.5rem)] xl:w-80 shrink-0 lg:sticky lg:top-4 lg:pl-10 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-foreground">Saved note sets</p>
+                  {noteSetsLoading && (
+                    <span className="text-xs text-muted-foreground">Loading…</span>
+                  )}
+                </div>
+                {STUDY_NOTE_SETS_DEMO && (
+                  <p className="text-xs text-muted-foreground">
+                    Demo cards are shown because{" "}
+                    <code className="font-mono">NEXT_PUBLIC_STUDY_DEMO=1</code>.
+                  </p>
+                )}
+                <div className="flex flex-col gap-3">
+                  {displayNoteSets.map((ns) => (
+                    <div
+                      key={ns.id}
+                      className="relative rounded-xl border border-border bg-muted/20 px-4 py-4 pr-12 shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setInspectNoteSet(ns)}
+                        className="absolute right-3 top-3 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                        aria-label="View prompt and topic insights"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                        >
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+                        </svg>
+                      </button>
+                      <p className="font-semibold text-foreground pr-2 leading-snug">{ns.name}</p>
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">
+                        {ns.subject === "science" ? "Science" : "History"}
+                        {ns.isDemo ? " · demo" : ""}
+                      </p>
+                      {ns.sessionResume && !ns.isDemo && (
+                        <p className="text-xs text-primary mt-1.5 leading-snug">
+                          Saved progress — picks up the same questions (no new AI call).
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void continueNoteSet(ns)}
+                        disabled={loading}
+                        className="mt-4 w-full inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-foreground text-background hover:opacity-90 disabled:opacity-50"
+                      >
+                        Continue studying
+                      </button>
+                    </div>
                   ))}
-                </select>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Built-in practice (no AI). More topics coming soon.
-                </p>
-              </div>
-            )}
-
-            {subject === "math" ? (
-              <button
-                type="button"
-                onClick={startMathPractice}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Start practice
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={generate}
-                disabled={loading || !notes.trim()}
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loading ? "Starting session…" : "Start practice session"}
-              </button>
+                </div>
+              </aside>
+              </>
             )}
           </div>
-
-          {subject !== "math" && (
-            <div>
-              <h2 className="text-lg font-semibold text-foreground mb-1">Your notes</h2>
-              <p className="text-sm text-muted-foreground mb-3">
-                Paste text or upload a <strong>.txt</strong> file (up to ~10 pages). Notes are sent only to
-                generate questions during your session.
-              </p>
-              <textarea
-                value={notes}
-                onChange={(e) => {
-                  setNotes(e.target.value.slice(0, MAX_CHARS));
-                  setError(null);
-                }}
-                rows={12}
-                placeholder="Paste your class notes, outline, or study sheet here…"
-                className="w-full px-4 py-3 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-y font-mono text-sm"
-              />
-              <div className="flex flex-wrap items-center justify-between gap-2 mt-2 text-xs text-muted-foreground">
-                <span>
-                  {notes.length.toLocaleString()} / {MAX_CHARS.toLocaleString()} characters
-                </span>
-                <label className="cursor-pointer text-primary hover:underline font-medium">
-                  Upload .txt
-                  <input type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-sm">
-              {error}
-            </div>
-          )}
         </div>
       )}
 
@@ -1003,9 +1473,7 @@ export default function StudyQuiz({ user }) {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-medium text-foreground leading-relaxed">
-                    {stripLeadingQuestionNumber(q.question)}
-                  </p>
+                  <QuestionPromptBlock q={q} questionIndex={i} variant="results" />
                   <div className="text-sm space-y-2">
                     <div>
                       <span className="font-medium text-foreground">Your answer: </span>
@@ -1055,42 +1523,58 @@ export default function StudyQuiz({ user }) {
         const q = quiz.questions[qi];
         const selected = selections[qi];
         const revealed = !!checkedSteps[qi];
+        const questionsAnswered = quiz.questions.reduce(
+          (acc, _, i) => acc + (checkedSteps[i] ? 1 : 0),
+          0
+        );
+        const questionsCorrect = quiz.questions.reduce((acc, _, i) => {
+          if (!checkedSteps[i] || stuckSteps[i]) return acc;
+          return acc + (selections[i] === quiz.questions[i].correctIndex ? 1 : 0);
+        }, 0);
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {error && (
               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-200 text-sm">
                 {error}
               </div>
             )}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="text-xl font-bold text-foreground">{quiz.title}</h2>
-                {isDemoSession && (
-                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
-                    Demo
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-muted-foreground tabular-nums px-3 py-1.5 rounded-full bg-muted/60 border border-border">
-                  Question {qi + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={endSession}
-                  className="px-4 py-2 border border-red-500/50 text-red-600 dark:text-red-400 rounded-lg text-sm font-medium hover:bg-red-500/10"
-                >
-                  End session
-                </button>
-              </div>
-            </div>
+            <StudySessionProgressHeader
+              topicTitle={
+                isDemoSession ? `${quiz.title} (demo)` : quiz.title
+              }
+              questionsAnswered={questionsAnswered}
+              questionsCorrect={questionsCorrect}
+              totalQuestions={quiz.questions.length}
+              onEndSession={endSession}
+            />
+            {!isDemoSession &&
+              (subject === "history" || subject === "science") &&
+              getDueReviewTagKeys(studyMastery, subject).length > 0 && (
+                <div className="rounded-lg border border-amber-200/80 dark:border-amber-800/80 bg-amber-50/90 dark:bg-amber-950/25 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
+                  <span className="font-medium">Skills due for review: </span>
+                  {getDueReviewTagKeys(studyMastery, subject)
+                    .map((k) => skillTagLabel(subject, k))
+                    .join(" · ")}
+                </div>
+              )}
 
-            <div className="rounded-xl border border-border bg-muted/10 p-5 md:p-6">
-              <p className="text-foreground font-medium mb-4">
-                <span className="text-muted-foreground mr-2 tabular-nums">{qi + 1}.</span>
-                {stripLeadingQuestionNumber(q.question)}
-              </p>
-              <ul className="space-y-2 pl-0 md:pl-2">
+            <div className="rounded-xl border border-border bg-muted/10 p-4 md:p-5">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-xs font-medium text-muted-foreground tabular-nums px-2 py-0.5 rounded-full bg-muted/60 border border-border">
+                  Question {qi + 1} of {quiz.questions.length}
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
+                  {difficultyPillLabel(q.difficulty)}
+                </span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
+                  {cognitivePillLabel(q.cognitiveLevel)}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {skillTagLabel(subject, normalizeSkillTag(subject, q.skillTag))}
+                </span>
+              </div>
+              <QuestionPromptBlock q={q} questionIndex={qi} variant="playing" />
+              <ul className="space-y-2 pl-0 md:pl-2 mt-4">
                 {q.options.map((opt, oi) => {
                   const isSelected = selected === oi;
                   const isCorrectOption = oi === q.correctIndex;
@@ -1156,6 +1640,130 @@ export default function StudyQuiz({ user }) {
           </div>
         );
       })()}
+
+      {inspectNoteSet &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex min-h-[100dvh] items-end sm:items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="note-set-inspect-title"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 min-h-[100dvh] bg-black/50"
+              onClick={() => setInspectNoteSet(null)}
+              aria-label="Close"
+            />
+            <div className="relative z-10 w-full max-w-lg max-h-[min(90vh,640px)] overflow-hidden flex flex-col rounded-xl border border-border bg-background shadow-lg">
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-border">
+              <h2 id="note-set-inspect-title" className="text-lg font-semibold text-foreground pr-8">
+                {inspectNoteSet.name}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setInspectNoteSet(null)}
+                className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto text-sm">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  Prompt (notes)
+                </p>
+                <pre className="whitespace-pre-wrap break-words text-foreground bg-muted/40 rounded-lg p-3 text-xs max-h-40 overflow-y-auto border border-border/80">
+                  {inspectNoteSet.notes || "—"}
+                </pre>
+              </div>
+              {inspectNoteSet.isDemo && inspectNoteSet.demoWeakness != null && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Current weakness (demo)
+                  </p>
+                  <p className="text-foreground leading-relaxed">{inspectNoteSet.demoWeakness}</p>
+                </div>
+              )}
+              {inspectNoteSet.isDemo && inspectNoteSet.demoStrengths != null && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    Strengths (demo)
+                  </p>
+                  <p className="text-foreground leading-relaxed">{inspectNoteSet.demoStrengths}</p>
+                </div>
+              )}
+              {!inspectNoteSet.isDemo && (() => {
+                const subj =
+                  inspectNoteSet.subject === "science" ? "science" : "history";
+                const low = getLowMasteryTagKeys(studyMastery, subj, 40);
+                const strong = getHighMasteryTagKeys(studyMastery, subj, 60);
+                const weakTopics = getTopWeakTopicKeys(studyWeakness, subj, 6);
+                return (
+                  <>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Current weakness
+                      </p>
+                      {weakTopics.length > 0 && (
+                        <p className="text-foreground mb-2">
+                          <span className="font-medium">Topics: </span>
+                          {weakTopics.join(" · ")}
+                        </p>
+                      )}
+                      {low.length > 0 ? (
+                        <ul className="list-disc pl-5 space-y-1 text-foreground">
+                          {low.map(({ tag, score }) => (
+                            <li key={tag}>
+                              {skillTagLabel(subj, tag)}{" "}
+                              <span className="text-muted-foreground tabular-nums">
+                                ({Math.round(score)}%)
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : weakTopics.length === 0 ? (
+                        <p className="text-muted-foreground">No weakness data yet for this subject.</p>
+                      ) : null}
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+                        Strengths
+                      </p>
+                      {strong.length > 0 ? (
+                        <ul className="list-disc pl-5 space-y-1 text-foreground">
+                          {strong.map((tag) => (
+                            <li key={tag}>{skillTagLabel(subj, tag)}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted-foreground">No strength data yet for this subject.</p>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            {!inspectNoteSet.isDemo && (
+              <div className="p-4 border-t border-border flex justify-end">
+                <button
+                  type="button"
+                  disabled={deletingNoteSet}
+                  onClick={() => void handleDeleteInspectNoteSet()}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-red-500/50 text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deletingNoteSet ? "Deleting…" : "Delete note set"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>,
+          document.body
+        )}
     </div>
   );
 }

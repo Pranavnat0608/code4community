@@ -38,10 +38,8 @@ export default function StudyPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <DashboardTopBar title="Code4Community" showNavLinks={true} />
 
-      <div className="flex-1 container mx-auto px-6 py-12">
-        <div className="max-w-2xl mx-auto w-full min-w-0 space-y-8">
-          <h1 className="text-3xl font-bold text-foreground">Studying</h1>
-
+      <div className="flex-1 container mx-auto px-6 py-4 md:py-6">
+        <div className="max-w-6xl mx-auto w-full min-w-0 space-y-6">
           <StudyQuiz user={user} />
         </div>
       </div>

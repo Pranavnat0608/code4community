@@ -19,10 +19,16 @@ export const DEMO_STUDY_QUIZ = {
         "A control group is held under standard conditions (or without the treatment) so researchers can compare outcomes to the experimental group and isolate the effect of the variable being tested.",
       skillTag: "experimental_logic",
       topicLabel: "Scientific method",
+      difficulty: "medium",
+      cognitiveLevel: "application",
     },
     {
+      stimulusQuote:
+        "The graph shows product concentration increasing roughly linearly over the first several minutes of an enzyme-catalyzed reaction at fixed temperature.",
+      stimulusCitation:
+        "Illustrative description for demo UI (AP-style stimulus layout).",
       question:
-        "A graph shows a linear increase in product concentration over time for an enzyme-catalyzed reaction. What does the initial slope of the curve best represent?",
+        "What does the initial slope of the curve best represent?",
       options: [
         "The total amount of substrate in the vessel",
         "The rate of reaction while substrate is abundant",
@@ -34,6 +40,8 @@ export const DEMO_STUDY_QUIZ = {
         "Early in the reaction, substrate is typically plentiful; the slope of product vs. time reflects how fast product is being formed — i.e., the reaction rate under those conditions.",
       skillTag: "data_inference",
       topicLabel: "Rates & graphs",
+      difficulty: "medium",
+      cognitiveLevel: "analysis",
     },
     {
       question:
@@ -49,6 +57,8 @@ export const DEMO_STUDY_QUIZ = {
         "Science updates models when data, methods, or theories provide a more accurate or useful description — revision is a strength of the process, not a failure.",
       skillTag: "models_limits",
       topicLabel: "Nature of science",
+      difficulty: "easy",
+      cognitiveLevel: "recall",
     },
   ],
 };

@@ -58,3 +58,12 @@ export function weakTagsHumanReadable(subject, weakTagKeys) {
   if (!Array.isArray(weakTagKeys) || weakTagKeys.length === 0) return [];
   return weakTagKeys.map((k) => map[k] || k).filter(Boolean);
 }
+
+/**
+ * @param {"history" | "science"} subject
+ * @param {string} key
+ */
+export function skillTagLabel(subject, key) {
+  const map = subject === "science" ? SCIENCE_SKILL_TAGS : HISTORY_SKILL_TAGS;
+  return map[key] || key;
+}

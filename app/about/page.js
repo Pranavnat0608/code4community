@@ -40,6 +40,9 @@ const members = [
   { name: "Joseph Ferrigno", role: "Developer", image: "/joseph.jpg", bio: STUDENT_BIO },
   { name: "Luke Swanson", role: "Developer", image: "/luke.jpg", bio: STUDENT_BIO },
   { name: "Aneesh Lavu", role: "Developer", image: "/aneesh.jpg", bio: STUDENT_BIO },
+  { name: "Ishir Aggarwal", role: "Developer", image: "/ishir.jpg", bio: STUDENT_BIO },
+  { name: "Khanh Nguyen", role: "Developer", image: "/khanh.jpg", bio: STUDENT_BIO },
+  { name: "Prathik Harikrishnan", role: "Developer", image: "/prathik.jpg", bio: STUDENT_BIO },
 ];
 
 const merriweatherStyle = { fontFamily: "'Merriweather', Georgia, serif" };
@@ -168,7 +171,7 @@ export default function AboutUs() {
 
       {/* Team section */}
       <div className="bg-background border-t border-border py-12 md:py-14 px-6">
-        <div className="max-w-4xl mx-auto md:max-w-5xl">
+        <div className="max-w-3xl mx-auto md:max-w-4xl">
           <h2
             className="text-2xl md:text-3xl font-bold text-foreground text-center mb-8 md:mb-9"
             style={merriweatherStyle}
@@ -177,14 +180,14 @@ export default function AboutUs() {
           </h2>
 
           {/* Leadership row — 3 across */}
-          <div className="mb-8 grid grid-cols-1 gap-x-1.5 gap-y-8 sm:grid-cols-3 sm:gap-x-2 sm:gap-y-6 md:mb-9">
+          <div className="mb-5 grid grid-cols-1 gap-x-0.5 gap-y-4 sm:grid-cols-3 sm:gap-x-1 sm:gap-y-3 md:mb-6">
             {leadership.map((member) => (
               <TeamMemberCard key={member.name} member={member} onOpen={setModalMember} />
             ))}
           </div>
 
           {/* Members — 4 across */}
-          <div className="grid grid-cols-2 gap-x-1.5 gap-y-7 md:grid-cols-4 md:gap-x-2 md:gap-y-6">
+          <div className="grid grid-cols-2 gap-x-0.5 gap-y-3 md:grid-cols-4 md:gap-x-1 md:gap-y-2.5">
             {members.map((member) => (
               <TeamMemberCard key={member.name} member={member} onOpen={setModalMember} />
             ))}

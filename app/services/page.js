@@ -94,6 +94,11 @@ const SNAP_HOLD_MS = 400; // After snapping to section, keep forcing scroll posi
 
 const MOBILE_BREAKPOINT = 768;
 
+function getInitialIsDesktop() {
+  if (typeof window === "undefined") return true;
+  return window.matchMedia(`(min-width: ${MOBILE_BREAKPOINT}px)`).matches;
+}
+
 export default function Services() {
   const scrollSectionRef = useRef(null);
   const sectionWasBelowRef = useRef(false);
@@ -101,7 +106,7 @@ export default function Services() {
   const slideIndexRef = useRef(0);
   const snapHoldUntilRef = useRef(0);
   const [slideIndex, setSlideIndex] = useState(0);
-  const [isDesktop, setIsDesktop] = useState(true);
+  const [isDesktop, setIsDesktop] = useState(getInitialIsDesktop);
 
   useLayoutEffect(() => {
     slideIndexRef.current = slideIndex;
@@ -113,7 +118,6 @@ export default function Services() {
 
   useEffect(() => {
     const m = window.matchMedia(`(min-width: ${MOBILE_BREAKPOINT}px)`);
-    setIsDesktop(m.matches);
     const f = () => setIsDesktop(m.matches);
     m.addEventListener("change", f);
     return () => m.removeEventListener("change", f);

@@ -10,7 +10,10 @@ import { auth, applyActionCode } from "@/firebase";
 export default function AuthVerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState("checking"); // 'checking' | 'success' | 'expired' | 'invalid'
+  const oobCode = searchParams.get("oobCode");
+  const mode = searchParams.get("mode");
+  const hasInvalidLink = mode !== "verifyEmail" || !oobCode;
+  const [status, setStatus] = useState(hasInvalidLink ? "invalid" : "checking"); // 'checking' | 'success' | 'expired' | 'invalid'
   const [errorMessage, setErrorMessage] = useState(null);
 
   useLayoutEffect(() => {
@@ -18,11 +21,7 @@ export default function AuthVerifyEmailPage() {
   }, []);
 
   useEffect(() => {
-    const oobCode = searchParams.get("oobCode");
-    const mode = searchParams.get("mode");
-
-    if (mode !== "verifyEmail" || !oobCode) {
-      setStatus("invalid");
+    if (hasInvalidLink || !oobCode) {
       return;
     }
 
@@ -56,7 +55,7 @@ export default function AuthVerifyEmailPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [searchParams, router]);
+  }, [hasInvalidLink, oobCode, router]);
 
   return (
     <AppPageLayout>

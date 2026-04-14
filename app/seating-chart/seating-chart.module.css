@@ -1,0 +1,547 @@
+/* Gynzy-inspired classroom seating chart tool chrome (scoped) */
+.scRoot {
+  --sc-header: #2a3541;
+  --sc-text: #556474;
+  --sc-placeholder: #8c99a8;
+  --sc-border: #d1d3de;
+  --sc-solitude: #e9eaef;
+  --sc-aqua: #f5f5f8;
+  --sc-white: #fff;
+  --sc-mariner: #277cd9;
+  --sc-mariner-extra: #eaf2fb;
+  --sc-negative: #ed1c24;
+  --sc-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1), 0 0 2px rgba(0, 0, 0, 0.12);
+  font-family: var(--font-seating-open), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--sc-text);
+  -webkit-font-smoothing: antialiased;
+  box-sizing: border-box;
+}
+
+.scRoot *,
+.scRoot *::before,
+.scRoot *::after {
+  box-sizing: border-box;
+}
+
+.componentContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 16px 24px 24px;
+}
+
+.mainContainer {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+  border: 1px solid var(--sc-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--sc-white);
+  box-shadow: var(--sc-shadow);
+}
+
+.sidePanel {
+  width: 380px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sc-border);
+  background: var(--sc-white);
+}
+
+.chartNameInput {
+  flex-shrink: 0;
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--sc-border);
+  background: var(--sc-white);
+}
+
+.chartNameInput input {
+  width: 100%;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--sc-border);
+  border-radius: 4px;
+  font-family: var(--font-seating-lexend), var(--font-seating-open), sans-serif;
+  font-size: 14px;
+  color: var(--sc-header);
+  background: var(--sc-white);
+  outline: none;
+}
+
+.chartNameInput input:focus {
+  border-color: var(--sc-mariner);
+  box-shadow: 0 0 0 2px var(--sc-mariner-extra);
+}
+
+.chartNameInput input::placeholder {
+  color: var(--sc-placeholder);
+}
+
+.sidePanelWrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Underline tabs (reference: blue active label + thick blue rule, grey inactive) */
+.sidePanelTabs {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  background: var(--sc-white);
+  border-bottom: 1px solid var(--sc-border);
+}
+
+.sidePanelTab {
+  flex: 1;
+  padding: 14px 12px 11px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  font-family: var(--font-seating-lexend), var(--font-seating-open), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sc-placeholder);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.sidePanelTab:hover {
+  color: var(--sc-header);
+}
+
+.sidePanelTabActive {
+  color: var(--sc-mariner);
+  border-bottom-color: var(--sc-mariner);
+}
+
+.sidePanelBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding: 0;
+  background: var(--sc-white);
+}
+
+.scrollButton {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: 32px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--sc-border);
+  border-radius: 4px;
+  background: var(--sc-white);
+  color: var(--sc-header);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition:
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+}
+
+.scrollButton:hover {
+  background: var(--sc-mariner-extra);
+  border-color: var(--sc-mariner);
+  color: var(--sc-mariner);
+}
+
+.scrollButtonTop {
+  top: 8px;
+}
+
+.scrollButtonHidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.sidePanelScrollFooter {
+  flex-shrink: 0;
+  border-top: 1px solid var(--sc-border);
+  background: var(--sc-white);
+  padding: 6px 0 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sidePanelScrollFooterBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sc-header);
+  cursor: pointer;
+  border-radius: 4px;
+  opacity: 0.75;
+}
+
+.sidePanelScrollFooterBtn:hover {
+  opacity: 1;
+  color: var(--sc-mariner);
+  background: var(--sc-mariner-extra);
+}
+
+.sidePanelContentWrapper {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 12px 8px;
+}
+
+.sidePanelContentWrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidePanelContentWrapper::-webkit-scrollbar-thumb {
+  background: var(--sc-border);
+  border-radius: 4px;
+}
+
+.sidePanelContent {
+  padding: 0 0 4px;
+}
+
+.furnitureGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 20px;
+  row-gap: 22px;
+  align-items: center;
+  justify-items: center;
+}
+
+/* Flat grid on white — no cards/boxes around each piece (reference layout). */
+.furniturePaletteItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: grab;
+  user-select: none;
+  transition: background 0.15s ease;
+  min-height: 0;
+  width: 100%;
+}
+
+.furniturePaletteItem:hover {
+  background: var(--sc-mariner-extra);
+}
+
+.furniturePaletteItem:active {
+  cursor: grabbing;
+}
+
+.furniturePaletteThumb {
+  border-radius: 2px;
+  border: none;
+  box-shadow: none;
+  flex-shrink: 0;
+}
+
+.furniturePaletteImg {
+  display: block;
+  object-fit: contain;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  max-width: 100%;
+}
+
+.studentsHint {
+  font-size: 12px;
+  color: var(--sc-placeholder);
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.colorRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.colorSwatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--sc-white);
+  box-shadow: 0 0 0 1px var(--sc-border);
+}
+
+.studentPaletteRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--sc-border);
+  background: var(--sc-white);
+  cursor: grab;
+  transition: border-color 0.15s ease;
+}
+
+.studentPaletteRow:hover {
+  border-color: var(--sc-mariner);
+}
+
+.studentPaletteRow:active {
+  cursor: grabbing;
+}
+
+.studentDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.studentName {
+  font-family: var(--font-seating-lexend), var(--font-seating-open), sans-serif;
+  font-size: 14px;
+  color: var(--sc-header);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editorPanel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sc-solitude);
+}
+
+.furnitureWrapper {
+  flex: 1;
+  min-height: 360px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.canvasDropZone {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  margin: 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 2px solid var(--sc-border);
+}
+
+.canvasInnerScroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+.canvasInnerScroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.canvasInnerScroll::-webkit-scrollbar-thumb {
+  background: var(--sc-border);
+  border-radius: 5px;
+}
+
+.canvasStage {
+  position: relative;
+  margin: 0 auto;
+  background: #ffffff;
+}
+
+.placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+  padding: 24px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.placeholderHidden {
+  opacity: 0;
+}
+
+.placeholderIcon {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 16px;
+  color: var(--sc-placeholder);
+}
+
+.placeholderText {
+  margin: 0;
+  font-family: var(--font-seating-lexend), var(--font-seating-open), sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--sc-placeholder);
+  text-align: center;
+}
+
+.zoomButtons {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  z-index: 20;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--sc-border);
+  box-shadow: var(--sc-shadow);
+}
+
+.zoomBtn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: var(--sc-white);
+  color: var(--sc-header);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid var(--sc-border);
+}
+
+.zoomBtn:last-child {
+  border-bottom: none;
+}
+
+.zoomBtn:hover {
+  background: var(--sc-mariner-extra);
+}
+
+.controlButtonsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0 0;
+  margin-top: 16px;
+  border-top: 1px solid var(--sc-border);
+}
+
+.controlLeft {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.buttonGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.btn {
+  min-width: 140px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 4px;
+  font-family: var(--font-seating-lexend), var(--font-seating-open), sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.btnSecondary {
+  background: var(--sc-solitude);
+  border-color: var(--sc-border);
+  color: var(--sc-header);
+}
+
+.btnSecondary:hover:not(:disabled) {
+  background: var(--sc-white);
+}
+
+.btnPrimary {
+  background: var(--sc-mariner);
+  border-color: var(--sc-mariner);
+  color: var(--sc-white);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.iconBtn {
+  min-width: 40px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+@media (max-width: 900px) {
+  .mainContainer {
+    flex-direction: column;
+  }
+
+  .sidePanel {
+    width: 100%;
+    max-height: 320px;
+  }
+}

@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../utils/AuthContext";
 import DashboardTopBar from "../components/DashboardTopBar";
 import Footer from "../components/Footer";
+import WorkProjectTile from "../components/WorkProjectTile";
+import { getFeaturedWorkProjects } from "../lib/workProjects";
 
 // Partner logos: add / replace with your partner images in public/
 const partners = [
@@ -299,40 +301,34 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Some of Our Work - live demos */}
+      {/* Some of Our Work */}
       <section className="border-t border-border bg-background py-16 md:py-20 px-6">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-2xl md:text-3xl font-bold text-foreground text-center mb-10">
             Some of Our Work
           </h2>
           <p className="text-center text-sm text-muted-foreground mb-8 max-w-xl mx-auto">
-            These are tools we have built for nonprofits and organizations that have served hundreds of users, including donor management, volunteer sign-up, and program reporting.
+            A few student-built tools we have shipped for teachers and the school community—grade tools, yearbook helpers, seating charts, and more to come.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { title: "Donor dashboard", desc: "Track giving, campaigns, and donor activity in one place.", href: "/demo/donor-dashboard", image: "/donor dashboard.png" },
-              { title: "Volunteer portal", desc: "Opportunity listings, sign-up, and shift management.", href: "/demo/volunteer-portal", image: "/volunteer portal.png" },
-              { title: "Program reporting", desc: "Outcomes, KPIs, and grant deliverables at a glance.", href: "/demo/reporting", image: "/program reporting.png" },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="group rounded-xl border border-border bg-background overflow-hidden shadow-sm transition-shadow block cursor-default opacity-90"
-              >
-                <div className="aspect-video bg-muted/50 border-b border-border relative overflow-hidden">
-                  <Image
-                    src={item.image}
-                    alt={item.title}
-                    fill
-                    className="object-cover object-top"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-foreground text-sm">{item.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{item.desc}</p>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
+            {getFeaturedWorkProjects().map((p) => (
+              <WorkProjectTile
+                key={p.id}
+                id={p.id}
+                title={p.title}
+                description={p.description}
+                available={p.available}
+                linkHref={p.href ?? `/work#${p.id}`}
+              />
             ))}
+          </div>
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/work"
+              className="inline-flex items-center justify-center rounded-[4px] border border-[#303d4e] px-10 py-2 text-[16px] font-[550] tracking-[-1px] text-[#303d4e] no-underline transition-colors hover:bg-[#303d4e] hover:text-white"
+            >
+              See all work
+            </Link>
           </div>
         </div>
       </section>

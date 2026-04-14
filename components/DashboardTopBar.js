@@ -50,6 +50,7 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
     { label: "HOME", path: "/" },
     { label: "ABOUT US", path: "/about" },
     { label: "SERVICES", path: "/services" },
+    { label: "WORK", path: "/work" },
     { label: "CONTACT", path: "/contact" },
     ...(user?.email === adminEmail ? [{ label: "ADMIN", path: "/admin" }] : []),
   ];
@@ -58,7 +59,7 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
   return (
     <>
       <MobileTopBar title={title} showNavLinks={showNavLinks} />
-      <header className={`hidden md:block bg-background border-b border-border px-6 py-4 relative z-40 ${pathname === '/' || pathname === '/services' || pathname === '/admin' ? 'mb-0' : 'mb-6'}`}>
+      <header className={`hidden md:block bg-background border-b border-border px-6 py-4 relative z-40 ${pathname === '/' || pathname === '/services' || pathname === '/work' || pathname === '/admin' ? 'mb-0' : 'mb-6'}`}>
         <div className="container mx-auto">
           <div className="flex items-center justify-between">
             {/* Logo and Title on Left */}

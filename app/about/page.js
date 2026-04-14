@@ -56,13 +56,18 @@ const merriweatherStyle = { fontFamily: "'Merriweather', Georgia, serif" };
 
 /** DeltaMath-style about description — font comes from `lato.className` on the section */
 const aboutBlurbDescriptionStyle = {
-  margin: 0,
   padding: 0,
   fontSize: "16px",
   fontWeight: 400,
   letterSpacing: "-0.2px",
   lineHeight: 1.6,
   WebkitFontSmoothing: "antialiased",
+};
+
+const aboutBlurbFirstParaStyle = {
+  ...aboutBlurbDescriptionStyle,
+  marginTop: 0,
+  marginBottom: "1.6em",
 };
 
 function TeamMemberCard({ member, onOpen }) {
@@ -165,8 +170,8 @@ export default function AboutUs() {
           <div className="w-full max-w-[17em] text-left md:max-w-[40em]">
             <div>
               <p
-                className="mb-[1.6em] text-[#212121] dark:text-neutral-200"
-                style={aboutBlurbDescriptionStyle}
+                className="text-[#212121] dark:text-neutral-200"
+                style={aboutBlurbFirstParaStyle}
               >
                 Shail Shah created Code4Community in 2023 when he wrote a simple program on calculating
                 grades with new assignments. Positive student response prompted him to kick into gear and
@@ -174,7 +179,7 @@ export default function AboutUs() {
               </p>
               <p
                 className="text-[#212121] dark:text-neutral-200"
-                style={aboutBlurbDescriptionStyle}
+                style={{ ...aboutBlurbDescriptionStyle, margin: 0 }}
               >
                 Code4Community was started as a club at Broad Run High School to build software that
                 teachers and organizations at our school could use. After building hundreds of

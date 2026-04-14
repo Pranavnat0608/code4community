@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import DashboardTopBar from "../../components/DashboardTopBar";
+import DashboardTopBar from "@/components/DashboardTopBar";
 
 /** Centered rectangle (not full-width). When fixedHeight, same size for all slides (desktop); otherwise expands to content (mobile). No internal scrolling. */
 function SlideContent({ leftText, rightContent, className = "", fixedHeight = false }) {

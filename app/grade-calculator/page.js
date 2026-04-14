@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useLayoutEffect } from "react";
-import DashboardTopBar from "../../components/DashboardTopBar";
-import Footer from "../../components/Footer";
+import { AppPageLayout } from "@/components/common/AppPageLayout";
 
 export default function GradeCalculator() {
   useLayoutEffect(() => {
@@ -847,8 +846,7 @@ export default function GradeCalculator() {
   const newGrade = getLetterGrade(newPercent);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      <DashboardTopBar title="Grade Calculator" />
+    <AppPageLayout title="Grade Calculator">
       
       <div className="flex-1 px-6 py-4">
         <div className="max-w-7xl mx-auto">
@@ -1064,8 +1062,7 @@ export default function GradeCalculator() {
         </div>
       </div>
       
-      <Footer />
-    </div>
+    </AppPageLayout>
   );
 }
 

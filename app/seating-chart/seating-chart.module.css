@@ -419,44 +419,6 @@
   text-align: center;
 }
 
-.zoomButtons {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  z-index: 20;
-  border-radius: 4px;
-  overflow: hidden;
-  border: 1px solid var(--sc-border);
-  box-shadow: var(--sc-shadow);
-}
-
-.zoomBtn {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: var(--sc-white);
-  color: var(--sc-header);
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid var(--sc-border);
-}
-
-.zoomBtn:last-child {
-  border-bottom: none;
-}
-
-.zoomBtn:hover {
-  background: var(--sc-mariner-extra);
-}
-
 .controlButtonsContainer {
   display: flex;
   flex-wrap: wrap;

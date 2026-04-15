@@ -22,20 +22,26 @@ const seatingLexendDeca = Lexend_Deca({
 
 // Furniture type definitions: { id, seats, w, h, color?, paletteImage?, pieceLabel?, labelColor? }
 // Optional paletteImage: path under /public for custom thumbnails.
+/** On-canvas desk PNG size (larger pieces read better from a distance). */
+const DESK_CANVAS_W = 152;
+const DESK_CANVAS_H = 146;
+/** Same width ratio as source art (128:72) relative to single desk width. */
+const DOUBLE_DESK_CANVAS_W = Math.round((128 / 72) * DESK_CANVAS_W);
+
 const FURNITURE_TYPES = [
   {
     id: "desk",
     seats: 1,
-    w: 72,
-    h: 70,
+    w: DESK_CANVAS_W,
+    h: DESK_CANVAS_H,
     color: "#8d6e63",
     paletteImage: "/seating-furniture/single%20desk.png",
   },
   {
     id: "double-desk",
     seats: 2,
-    w: 128,
-    h: 70,
+    w: DOUBLE_DESK_CANVAS_W,
+    h: DESK_CANVAS_H,
     color: "#8d6e63",
     paletteImage: "/seating-furniture/double%20desk.png",
   },
@@ -52,6 +58,21 @@ const RESTRICTION_TYPES = [
   { id: "cannot_sit_together", label: "Cannot sit together" },
   { id: "must_sit_near_front", label: "Must sit near front" },
 ];
+
+/** First word only — short desk labels after shuffle / on furniture art. */
+function deskLabelFromStudentName(name) {
+  if (!name || typeof name !== "string") return "";
+  const t = name.trim();
+  if (!t) return "";
+  return t.split(/\s+/)[0];
+}
+
+const DESK_LABEL_TEXT_SHADOW = "0 0 4px #000, 0 1px 3px rgba(0,0,0,0.85)";
+/** Name sits on brown tabletop — below beige seat strip in desk PNGs. */
+const DESK_LABEL_BAND_SINGLE = { top: "34%", height: "58%" };
+/** Each half of a double desk: own horizontal slice so names align to that desk only. */
+const DESK_LABEL_BAND_DOUBLE_HALF = { top: "38%", height: "54%" };
+const DESK_LABEL_FONT_PX = 16;
 
 /** When false, furniture always lands exactly under the pointer (no edge magnetism). */
 const ENABLE_FURNITURE_SNAP = false;
@@ -127,7 +148,6 @@ export default function SeatingChart() {
   const [furnitureOnCanvas, setFurnitureOnCanvas] = useState([]);
   const [restrictions, setRestrictions] = useState([]);
   const [hasLoadedFromStorage, setHasLoadedFromStorage] = useState(false);
-  const [zoom, setZoom] = useState(1);
   const [showManageStudents, setShowManageStudents] = useState(false);
   const [manageStudentsText, setManageStudentsText] = useState("");
   const [sheetAnimated, setSheetAnimated] = useState(false);
@@ -158,11 +178,14 @@ export default function SeatingChart() {
     } catch (_) {}
     setHasLoadedFromStorage(true);
   }, [hasLoadedFromStorage]);
+
   const [newRestrictionType, setNewRestrictionType] = useState("cannot_sit_together");
   const [newRestrictionStudent1, setNewRestrictionStudent1] = useState("");
   const [newRestrictionStudent2, setNewRestrictionStudent2] = useState("");
   const canvasRef = useRef(null);
   const canvasScrollRef = useRef(null);
+  /** Furniture `left`/`top` are relative to this node (`.canvasStage`), which is `margin: 0 auto` inside the wider scroll layer — not the scroll layer origin. */
+  const canvasStageRef = useRef(null);
   const sidePanelScrollRef = useRef(null);
   const [sidePanelScroll, setSidePanelScroll] = useState({ showUp: false, showDown: false });
   const [dragState, setDragState] = useState(null);
@@ -278,17 +301,15 @@ export default function SeatingChart() {
     );
   }, []);
 
-  /** Map pointer to logical canvas coords (center of furniture). Uses the scaled inner layer’s rect so border + transform match the drawn canvas. */
+  /** Map pointer to stage-local coords (same space as furniture `left`/`top`, which are children of `.canvasStage`). */
   const getCanvasCoords = useCallback((e) => {
-    const scrollEl = canvasScrollRef.current;
-    if (!scrollEl) return null;
-    const rect = scrollEl.getBoundingClientRect();
-    const scrollLeft = scrollEl.scrollLeft || 0;
-    const scrollTop = scrollEl.scrollTop || 0;
-    const x = (e.clientX - rect.left + scrollLeft) / zoom;
-    const y = (e.clientY - rect.top + scrollTop) / zoom;
+    const stage = canvasStageRef.current;
+    if (!stage) return null;
+    const r = stage.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
     return { x, y };
-  }, [zoom]);
+  }, []);
 
   const handleCanvasDrop = (e) => {
     e.preventDefault();
@@ -363,8 +384,8 @@ export default function SeatingChart() {
         wrap.style.left = "-9999px";
         wrap.style.pointerEvents = "none";
         wrap.style.overflow = "hidden";
-        wrap.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
-        wrap.style.border = "1px solid rgba(0,0,0,0.12)";
+        wrap.style.boxShadow = stretch ? "none" : "0 2px 6px rgba(0,0,0,0.2)";
+        wrap.style.border = stretch ? "none" : "1px solid rgba(0,0,0,0.12)";
         const img = document.createElement("img");
         img.src = def.paletteImage;
         img.alt = "";
@@ -406,8 +427,8 @@ export default function SeatingChart() {
       const f = furnitureOnCanvas.find((x) => x.id === furnitureId);
       if (f) {
         const def = FURNITURE_TYPES.find((t) => t.id === f.type) || FURNITURE_TYPES[0];
-        const names = (f.assignedStudentIds || [])
-          .map((sid) => students.find((s) => s.id === sid)?.name)
+        const deskLabels = (f.assignedStudentIds || [])
+          .map((sid) => deskLabelFromStudentName(students.find((s) => s.id === sid)?.name))
           .filter(Boolean);
         if (def.paletteImage) {
           const stretch = def.id === "desk" || def.id === "double-desk";
@@ -420,8 +441,8 @@ export default function SeatingChart() {
           wrap.style.left = "-9999px";
           wrap.style.pointerEvents = "none";
           wrap.style.overflow = "hidden";
-          wrap.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
-          wrap.style.border = "2px solid rgba(0,0,0,0.12)";
+          wrap.style.boxShadow = stretch ? "none" : "0 2px 6px rgba(0,0,0,0.2)";
+          wrap.style.border = stretch ? "none" : "2px solid rgba(0,0,0,0.12)";
           const img = document.createElement("img");
           img.src = def.paletteImage;
           img.alt = "";
@@ -432,22 +453,86 @@ export default function SeatingChart() {
           img.style.objectPosition = "center";
           img.style.display = "block";
           wrap.appendChild(img);
-          const span = document.createElement("span");
-          span.style.fontSize = "12px";
-          span.style.fontWeight = "500";
-          span.style.textAlign = "center";
-          span.style.lineHeight = "1.2";
-          span.style.position = "absolute";
-          span.style.left = "0";
-          span.style.right = "0";
-          span.style.bottom = "4px";
-          span.style.zIndex = "1";
-          span.style.color = def.seats === 0 ? def.labelColor || "#fff" : "#fff";
-          if (def.seats !== 0 && names.length > 0) {
-            span.style.textShadow = "0 0 4px #000, 0 1px 3px rgba(0,0,0,0.85)";
-          }
-          span.textContent = def.seats === 0 ? def.pieceLabel || "Front" : names.length > 0 ? names.join(", ") : "";
-          if (span.textContent) wrap.appendChild(span);
+          const appendDeskLabelOverlay = () => {
+            if (def.seats === 0) {
+              const span = document.createElement("span");
+              span.style.fontSize = "12px";
+              span.style.fontWeight = "500";
+              span.style.textAlign = "center";
+              span.style.lineHeight = "1.2";
+              span.style.position = "absolute";
+              span.style.left = "0";
+              span.style.right = "0";
+              span.style.top = "0";
+              span.style.bottom = "0";
+              span.style.zIndex = "1";
+              span.style.display = "flex";
+              span.style.alignItems = "center";
+              span.style.justifyContent = "center";
+              span.style.color = def.labelColor || "#fff";
+              span.textContent = def.pieceLabel || "Front";
+              wrap.appendChild(span);
+              return;
+            }
+            if (deskLabels.length === 0) return;
+            const mkNameSpan = (text) => {
+              const span = document.createElement("span");
+              span.style.fontSize = `${DESK_LABEL_FONT_PX}px`;
+              span.style.fontWeight = "600";
+              span.style.lineHeight = "1.15";
+              span.style.color = "#fff";
+              span.style.textShadow = DESK_LABEL_TEXT_SHADOW;
+              span.style.textAlign = "center";
+              span.style.overflow = "hidden";
+              span.style.textOverflow = "ellipsis";
+              span.style.whiteSpace = "nowrap";
+              span.style.maxWidth = "100%";
+              span.textContent = text;
+              return span;
+            };
+            const appendFullWidthBand = () => {
+              const slot = document.createElement("div");
+              slot.style.position = "absolute";
+              slot.style.left = "0";
+              slot.style.right = "0";
+              slot.style.top = DESK_LABEL_BAND_SINGLE.top;
+              slot.style.height = DESK_LABEL_BAND_SINGLE.height;
+              slot.style.display = "flex";
+              slot.style.alignItems = "center";
+              slot.style.justifyContent = "center";
+              slot.style.zIndex = "1";
+              slot.style.boxSizing = "border-box";
+              slot.style.paddingLeft = "6px";
+              slot.style.paddingRight = "6px";
+              const span = mkNameSpan(deskLabels.length > 1 ? deskLabels.join(" · ") : deskLabels[0]);
+              slot.appendChild(span);
+              wrap.appendChild(slot);
+            };
+            if (def.id === "double-desk" && deskLabels.length === 2) {
+              const mkHalf = (left, label) => {
+                const half = document.createElement("div");
+                half.style.position = "absolute";
+                half.style.left = left;
+                half.style.width = "50%";
+                half.style.top = DESK_LABEL_BAND_DOUBLE_HALF.top;
+                half.style.height = DESK_LABEL_BAND_DOUBLE_HALF.height;
+                half.style.display = "flex";
+                half.style.alignItems = "center";
+                half.style.justifyContent = "center";
+                half.style.zIndex = "1";
+                half.style.boxSizing = "border-box";
+                half.style.paddingLeft = "4px";
+                half.style.paddingRight = "4px";
+                half.appendChild(mkNameSpan(label));
+                wrap.appendChild(half);
+              };
+              mkHalf("0", deskLabels[0]);
+              mkHalf("50%", deskLabels[1]);
+            } else {
+              appendFullWidthBand();
+            }
+          };
+          appendDeskLabelOverlay();
           document.body.appendChild(wrap);
           dragImageRef.current = wrap;
           const setGhost = () => e.dataTransfer.setDragImage(wrap, f.w / 2, f.h / 2);
@@ -476,7 +561,7 @@ export default function SeatingChart() {
           span.style.textAlign = "center";
           span.style.lineHeight = "1.2";
           span.style.color = def.seats === 0 ? def.labelColor || "#fff" : "#fff";
-          span.textContent = def.seats === 0 ? def.pieceLabel || "Front" : names.length > 0 ? names.join(", ") : "";
+          span.textContent = def.seats === 0 ? def.pieceLabel || "Front" : deskLabels.length > 0 ? deskLabels.join(", ") : "";
           if (span.textContent) div.appendChild(span);
           document.body.appendChild(div);
           dragImageRef.current = div;
@@ -801,8 +886,8 @@ export default function SeatingChart() {
 
   const renderFurnitureShape = (f, isDropTarget, idx = 0) => {
     const def = FURNITURE_TYPES.find((t) => t.id === f.type) || FURNITURE_TYPES[0];
-    const studentNames = (f.assignedStudentIds || [])
-      .map((sid) => students.find((s) => s.id === sid)?.name)
+    const deskStudentLabels = (f.assignedStudentIds || [])
+      .map((sid) => deskLabelFromStudentName(students.find((s) => s.id === sid)?.name))
       .filter(Boolean);
     const isSelected = selectedFurnitureId === f.id;
     const isDragging = dragState?.type === "canvas-furniture" && dragState?.furnitureId === f.id;
@@ -835,7 +920,7 @@ export default function SeatingChart() {
           transform: `translate3d(-50%, -50%, 0) rotate(${rotation}deg)`,
           backgroundColor: def.paletteImage ? "transparent" : def.color || "#8B4513",
           border: def.paletteImage ? paletteBorder : isDropTarget ? pieceBorder : pieceBorderSolid,
-          boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
+          boxShadow: deskStretchArt ? "none" : "0 2px 6px rgba(0,0,0,0.2)",
           display: def.paletteImage ? "block" : "flex",
           flexDirection: def.paletteImage ? undefined : "column",
           alignItems: def.paletteImage ? undefined : "center",
@@ -868,8 +953,6 @@ export default function SeatingChart() {
               userSelect: "none",
               display: "block",
               zIndex: 0,
-              /* On grey floor: turns flat white “matte” in exports into floor tone; real alpha still works */
-              mixBlendMode: deskStretchArt ? "multiply" : undefined,
             }}
           />
         ) : null}
@@ -891,23 +974,133 @@ export default function SeatingChart() {
           >
             {def.pieceLabel || "Front"}
           </span>
-        ) : studentNames.length > 0 ? (
-          <span
-            className="text-xs font-medium text-center leading-tight pointer-events-none"
-            style={{
-              color: "#fff",
-              textShadow: "0 0 4px #000, 0 1px 3px rgba(0,0,0,0.85)",
-              position: def.paletteImage ? "absolute" : "relative",
-              left: def.paletteImage ? 0 : undefined,
-              right: def.paletteImage ? 0 : undefined,
-              bottom: def.paletteImage ? 6 : undefined,
-              zIndex: 1,
-              display: def.paletteImage ? "block" : undefined,
-              textAlign: "center",
-            }}
-          >
-            {studentNames.join(", ")}
-          </span>
+        ) : deskStudentLabels.length > 0 ? (
+          def.paletteImage && deskStretchArt ? (
+            def.id === "double-desk" && deskStudentLabels.length === 2 ? (
+              <>
+                <div
+                  className="pointer-events-none"
+                  style={{
+                    position: "absolute",
+                    left: 0,
+                    width: "50%",
+                    top: DESK_LABEL_BAND_DOUBLE_HALF.top,
+                    height: DESK_LABEL_BAND_DOUBLE_HALF.height,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 1,
+                    boxSizing: "border-box",
+                    paddingLeft: 4,
+                    paddingRight: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: DESK_LABEL_FONT_PX,
+                      fontWeight: 600,
+                      lineHeight: 1.15,
+                      color: "#fff",
+                      textAlign: "center",
+                      textShadow: DESK_LABEL_TEXT_SHADOW,
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {deskStudentLabels[0]}
+                  </span>
+                </div>
+                <div
+                  className="pointer-events-none"
+                  style={{
+                    position: "absolute",
+                    left: "50%",
+                    width: "50%",
+                    top: DESK_LABEL_BAND_DOUBLE_HALF.top,
+                    height: DESK_LABEL_BAND_DOUBLE_HALF.height,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    zIndex: 1,
+                    boxSizing: "border-box",
+                    paddingLeft: 4,
+                    paddingRight: 4,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: DESK_LABEL_FONT_PX,
+                      fontWeight: 600,
+                      lineHeight: 1.15,
+                      color: "#fff",
+                      textAlign: "center",
+                      textShadow: DESK_LABEL_TEXT_SHADOW,
+                      maxWidth: "100%",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {deskStudentLabels[1]}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div
+                className="pointer-events-none"
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  right: 0,
+                  top: DESK_LABEL_BAND_SINGLE.top,
+                  height: DESK_LABEL_BAND_SINGLE.height,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  zIndex: 1,
+                  boxSizing: "border-box",
+                  paddingLeft: 6,
+                  paddingRight: 6,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: DESK_LABEL_FONT_PX,
+                    fontWeight: 600,
+                    lineHeight: 1.15,
+                    color: "#fff",
+                    textAlign: "center",
+                    textShadow: DESK_LABEL_TEXT_SHADOW,
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {deskStudentLabels.length > 1 ? deskStudentLabels.join(" · ") : deskStudentLabels[0]}
+                </span>
+              </div>
+            )
+          ) : (
+            <span
+              className="text-xs font-medium text-center leading-tight pointer-events-none"
+              style={{
+                color: "#fff",
+                textShadow: DESK_LABEL_TEXT_SHADOW,
+                position: def.paletteImage ? "absolute" : "relative",
+                left: def.paletteImage ? 0 : undefined,
+                right: def.paletteImage ? 0 : undefined,
+                bottom: def.paletteImage ? 6 : undefined,
+                zIndex: 1,
+                display: def.paletteImage ? "block" : undefined,
+                textAlign: "center",
+              }}
+            >
+              {deskStudentLabels.join(", ")}
+            </span>
+          )
         ) : null}
       </div>
     );
@@ -1175,28 +1368,20 @@ export default function SeatingChart() {
                 <div
                   ref={canvasScrollRef}
                   className={styles.canvasInnerScroll}
-                  style={{ transform: `scale(${zoom})`, transformOrigin: "0 0" }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    e.dataTransfer.dropEffect = "move";
-                  }}
+                  onDragOver={handleCanvasDragOver}
                   onDrop={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     handleCanvasDrop(e);
                   }}
                 >
-                  <div className={styles.canvasStage} style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}>
+                  <div
+                    ref={canvasStageRef}
+                    className={styles.canvasStage}
+                    style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT }}
+                  >
                     {furnitureOnCanvas.map((f, idx) => renderFurnitureShape(f, dropTargetId === f.id, idx))}
                   </div>
-                </div>
-                <div className={`${styles.zoomButtons} zoom-buttons-container`}>
-                  <button type="button" className={styles.zoomBtn} onClick={() => setZoom((z) => Math.min(1.5, z + 0.1))} aria-label="Zoom in">
-                    +
-                  </button>
-                  <button type="button" className={styles.zoomBtn} onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out">
-                    −
-                  </button>
                 </div>
               </div>
             </div>

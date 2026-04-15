@@ -16,23 +16,45 @@ const BASE_NAV_LINKS = [
 ];
 const ADMIN_EMAIL = "shail40926@gmail.com";
 
-function TopBarContent({
-  isMenuOpen,
-  closeMenu,
-  openMenu,
-  router,
-  user,
-  title,
-  showNavLinks,
-  loading,
-  displayName,
-}) {
+export default function MobileTopBar({ title = "Code4Community", showNavLinks = true }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, loading } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (menuOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [menuOpen]);
+
+  const closeMenu = () => setMenuOpen(false);
+
+  const handleNav = (path) => {
+    router.push(path);
+    closeMenu();
+  };
+
+  const handleSignOut = async () => {
+    closeMenu();
+    try {
+      await signOut(auth);
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
+  };
+
+  const displayName = user?.displayName || user?.email?.split("@")[0] || "Account";
+
+  // Same top bar layout in both states so it never looks different (no overlap/smush)
   const topBarClasses = "flex items-center justify-between w-full px-4 py-3 border-b border-gray-200 bg-white";
   const leftSectionClasses = "flex items-center gap-3 min-w-0 flex-1";
   const titleClasses = "font-bold text-black text-lg truncate";
   const rightSectionClasses = "flex items-center gap-2 shrink-0";
 
-  return (
+  const TopBarContent = ({ isMenuOpen }) => (
     <div className={topBarClasses}>
       <div className={leftSectionClasses}>
         {isMenuOpen ? (
@@ -49,7 +71,7 @@ function TopBarContent({
         ) : (
           <button
             type="button"
-            onClick={openMenu}
+            onClick={() => setMenuOpen(true)}
             className="p-2 -ml-2 text-black hover:bg-gray-100 rounded focus:outline-none focus:ring-2 focus:ring-gray-300 shrink-0"
             aria-label="Open menu"
           >
@@ -88,56 +110,12 @@ function TopBarContent({
       )}
     </div>
   );
-}
-
-export default function MobileTopBar({ title = "Code4Community", showNavLinks = true }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { user, loading } = useAuth();
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (menuOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [menuOpen]);
-
-  const closeMenu = () => setMenuOpen(false);
-
-  const handleNav = (path) => {
-    router.push(path);
-    closeMenu();
-  };
-
-  const handleSignOut = async () => {
-    closeMenu();
-    try {
-      await signOut(auth);
-      router.push("/");
-      router.refresh();
-    } catch (err) {
-      console.error("Sign out error:", err);
-    }
-  };
-
-  const displayName = user?.displayName || user?.email?.split("@")[0] || "Account";
-  const openMenu = () => setMenuOpen(true);
 
   return (
     <>
       {/* Top bar: always same layout */}
       <header className={`md:hidden relative z-40 ${pathname === "/" || pathname === "/services" || pathname === "/work" ? "mb-0" : "mb-6"}`}>
-        <TopBarContent
-          isMenuOpen={false}
-          closeMenu={closeMenu}
-          openMenu={openMenu}
-          router={router}
-          user={user}
-          title={title}
-          showNavLinks={showNavLinks}
-          loading={loading}
-          displayName={displayName}
-        />
+        <TopBarContent isMenuOpen={false} />
       </header>
 
       {/* Full-screen menu overlay: same top bar at top, then nav links */}
@@ -149,17 +127,7 @@ export default function MobileTopBar({ title = "Code4Community", showNavLinks = 
           aria-label="Menu"
         >
           <div className="shrink-0">
-            <TopBarContent
-              isMenuOpen={true}
-              closeMenu={closeMenu}
-              openMenu={openMenu}
-              router={router}
-              user={user}
-              title={title}
-              showNavLinks={showNavLinks}
-              loading={loading}
-              displayName={displayName}
-            />
+            <TopBarContent isMenuOpen={true} />
           </div>
 
           {/* Nav links */}

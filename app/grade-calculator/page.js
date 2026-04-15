@@ -797,119 +797,162 @@ export default function GradeCalculator() {
 
   return (
     <AppPageLayout title="Grade Calculator">
-      
-      <div className="flex-1 px-6 py-4">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-foreground mb-6">Grade Calculator</h1>
-          
-          {/* Paste Area */}
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Paste your gradebook data from Synergy:
-            </label>
-            <textarea
-              value={pastedText}
-              onChange={(e) => setPastedText(e.target.value)}
-              placeholder="Paste your gradebook data here... (Select grid option and then paste content of whole page by doing crtl a crtl c)"
-              className="w-full h-32 px-4 py-2 text-sm text-foreground bg-background border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary resize-none"
-            />
-            <button
-              onClick={handleParse}
-              className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              Parse Grades
-            </button>
-          </div>
-
-          {/* Results */}
-          {assignments.length > 0 && (
-            <div className="space-y-6">
-              {/* Grade Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="card-elevated p-6 rounded-xl">
-                  <h3 className="text-lg font-semibold text-foreground mb-2">{courseName}</h3>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-muted-foreground">{currentGrade}</span>
-                    <span className="text-xl text-muted-foreground">{currentPercent.toFixed(2)}%</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">Current Grade</p>
+      <div className="flex-1 bg-gradient-to-b from-background to-muted/20 px-4 py-6 md:px-6 md:py-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <section className="rounded-2xl border border-border bg-background/95 shadow-sm">
+            <div className="border-b border-border px-6 py-5 md:px-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">Grade Calculator</h1>
+              <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-3xl">
+                Paste your Synergy gradebook export to calculate your current grade and preview how changes to future
+                assignments affect your overall result.
+              </p>
+            </div>
+            <div className="px-6 py-5 md:px-8 md:py-6">
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+                <div>
+                  <label className="block text-sm font-semibold text-foreground mb-2">
+                    Synergy gradebook data
+                  </label>
+                  <textarea
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder="Paste your full Synergy gradebook page here (Ctrl+A, Ctrl+C, then paste)."
+                    className="h-36 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
                 </div>
-                
-                {hasChanges && (
-                  <div className="card-elevated p-6 rounded-xl">
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Projected Grade</h3>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-primary">{newGrade}</span>
-                      <span className={`text-xl ${newPercent > currentPercent ? 'text-green-500' : newPercent < currentPercent ? 'text-red-500' : 'text-muted-foreground'}`}>
-                        {newPercent.toFixed(2)}%
-                      </span>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {newPercent > currentPercent 
-                        ? `+${(newPercent - currentPercent).toFixed(2)}% increase` 
-                        : newPercent < currentPercent 
-                        ? `${(currentPercent - newPercent).toFixed(2)}% decrease`
-                        : "No change"}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Control Buttons */}
-              <div className="flex gap-3">
-                {hasChanges && (
+                <div className="flex flex-col gap-3 lg:w-56">
                   <button
-                    onClick={resetAll}
-                    className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 transition-colors"
+                    onClick={handleParse}
+                    className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
                   >
-                    Reset All Changes
+                    Parse gradebook
                   </button>
-                )}
-                <button
-                  onClick={addNewAssignment}
-                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-                >
-                  + Add Assignment
-                </button>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Parsing updates your course snapshot, assignment list, and weighting profile.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {assignments.length > 0 && (
+            <section className="space-y-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current grade</p>
+                  <h2 className="mt-2 text-lg font-semibold text-foreground">{courseName}</h2>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-foreground">{currentGrade}</span>
+                    <span className="text-xl font-semibold text-muted-foreground">{currentPercent.toFixed(2)}%</span>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {useWeightedGrading ? "Weighted grading detected" : "Points-based grading"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border bg-background p-5 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Projected grade</p>
+                  {hasChanges ? (
+                    <>
+                      <div className="mt-6 flex items-baseline gap-2">
+                        <span className="text-4xl font-bold text-primary">{newGrade}</span>
+                        <span
+                          className={`text-xl font-semibold ${
+                            newPercent > currentPercent
+                              ? "text-green-600"
+                              : newPercent < currentPercent
+                                ? "text-red-600"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {newPercent.toFixed(2)}%
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {newPercent > currentPercent
+                          ? `+${(newPercent - currentPercent).toFixed(2)}% increase`
+                          : newPercent < currentPercent
+                            ? `${(currentPercent - newPercent).toFixed(2)}% decrease`
+                            : "No change"}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-6 text-sm text-muted-foreground">
+                      Edit assignment scores to preview your projected outcome.
+                    </p>
+                  )}
+                </div>
               </div>
 
-              {/* Assignments Table */}
-              <div className="card-elevated rounded-xl overflow-hidden">
+              <div className="rounded-2xl border border-border bg-background p-4 shadow-sm md:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-sm text-muted-foreground">
+                    Showing{" "}
+                    <span className="font-semibold text-foreground">
+                      {assignments.filter((assignment) => visibleCategories[assignment.category]).length}
+                    </span>{" "}
+                    of <span className="font-semibold text-foreground">{assignments.length}</span> assignments
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {hasChanges && (
+                      <button
+                        onClick={resetAll}
+                        className="rounded-lg border border-border bg-secondary px-3.5 py-2 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/90"
+                      >
+                        Reset all changes
+                      </button>
+                    )}
+                    <button
+                      onClick={addNewAssignment}
+                      className="rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90"
+                    >
+                      + Add assignment
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-2xl border border-border bg-background shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
+                  <table className="w-full min-w-[920px]">
+                    <thead className="bg-muted/60">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Date</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Assignment</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground relative">
-                          <div className="flex items-center gap-2 filter-menu-container">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Assignment</th>
+                        <th className="relative px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          <div className="filter-menu-container inline-flex items-center gap-2">
                             Category
                             <button
                               onClick={() => setShowFilterMenu(!showFilterMenu)}
-                              className="relative text-muted-foreground hover:text-foreground transition-colors"
+                              className="rounded-md p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                               title="Filter categories"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                               </svg>
                             </button>
-                            
-                            {/* Filter Menu */}
                             {showFilterMenu && (
-                              <div className="absolute left-0 top-full mt-2 w-48 bg-background border border-border rounded-md shadow-lg z-50">
-                                <div className="p-2 space-y-1">
-                                  {Object.keys(visibleCategories).map(category => (
-                                    <label key={category} className="flex items-center gap-2 px-3 py-2 hover:bg-muted/50 rounded cursor-pointer">
+                              <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-lg border border-border bg-background p-2 shadow-lg">
+                                <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                  Visible categories
+                                </p>
+                                <div className="space-y-1">
+                                  {Object.keys(visibleCategories).map((category) => (
+                                    <label
+                                      key={category}
+                                      className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-muted/50"
+                                    >
                                       <input
                                         type="checkbox"
                                         checked={visibleCategories[category]}
-                                        onChange={(e) => setVisibleCategories({
-                                          ...visibleCategories,
-                                          [category]: e.target.checked
-                                        })}
-                                        className="w-4 h-4"
+                                        onChange={(e) =>
+                                          setVisibleCategories({
+                                            ...visibleCategories,
+                                            [category]: e.target.checked,
+                                          })
+                                        }
+                                        className="h-4 w-4"
                                       />
-                                      <span className="text-sm text-foreground">{category}</span>
+                                      <span className="text-foreground">{category}</span>
                                     </label>
                                   ))}
                                 </div>
@@ -917,54 +960,61 @@ export default function GradeCalculator() {
                             )}
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Score</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Possible</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">%</th>
-                        <th className="px-4 py-3 text-left text-sm font-medium text-foreground">Actions</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Possible</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">% Score</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {assignments.filter(assignment => visibleCategories[assignment.category]).map((assignment) => {
+                      {assignments.filter((assignment) => visibleCategories[assignment.category]).map((assignment) => {
                         const earned = assignment.earned === "" ? 0 : (assignment.earned || 0);
                         const possible = assignment.possible === "" ? 0 : (assignment.possible || 0);
-                        const percent = possible > 0 
-                          ? (earned / possible) * 100 
-                          : 0;
+                        const percent = possible > 0 ? (earned / possible) * 100 : 0;
                         const earnedValue = assignment.earned === "" ? 0 : (assignment.earned || 0);
                         const possibleValue = assignment.possible === "" ? 0 : (assignment.possible || 0);
-                        const isChanged = earnedValue !== assignment.originalEarned || possibleValue !== assignment.originalPossible;
-                        
+                        const isChanged =
+                          earnedValue !== assignment.originalEarned || possibleValue !== assignment.originalPossible;
+
                         return (
-                          <tr key={assignment.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                          <tr
+                            key={assignment.id}
+                            className="border-t border-border odd:bg-background even:bg-muted/20 hover:bg-primary/5 transition-colors"
+                          >
                             <td className="px-4 py-3 text-sm text-foreground">{assignment.date}</td>
                             <td className="px-4 py-3">
                               <input
                                 type="text"
                                 value={assignment.name}
-                                onChange={(e) => updateAssignment(assignment.id, 'name', e.target.value)}
-                                className="w-full px-2 py-1 text-sm text-foreground bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                onChange={(e) => updateAssignment(assignment.id, "name", e.target.value)}
+                                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                               />
                             </td>
                             <td className="px-4 py-3">
                               <select
                                 value={assignment.category}
-                                onChange={(e) => updateAssignment(assignment.id, 'category', e.target.value)}
-                                className="w-full px-2 py-1 text-sm text-foreground bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary"
+                                onChange={(e) => updateAssignment(assignment.id, "category", e.target.value)}
+                                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                               >
                                 <option value="Major Summative">Major Summative</option>
                                 <option value="Minor Summative">Minor Summative</option>
                                 <option value="Graded Formative">Graded Formative</option>
                                 <option value="Extra Credit">Extra Credit</option>
+                                <option value="Other">Other</option>
                               </select>
                             </td>
                             <td className="px-4 py-3">
                               <input
                                 type="number"
                                 value={assignment.earned === "" ? "" : (assignment.earned || 0)}
-                                onChange={(e) => handleScoreChange(assignment.id, 'earned', e.target.value)}
+                                onChange={(e) => handleScoreChange(assignment.id, "earned", e.target.value)}
                                 onFocus={handleScoreFocus}
-                                onBlur={(e) => handleScoreBlur(assignment.id, 'earned', e.target.value)}
-                                className={`w-20 px-2 py-1 text-sm text-foreground bg-background border border-border rounded ${isChanged ? 'border-primary ring-1 ring-primary' : 'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary'}`}
+                                onBlur={(e) => handleScoreBlur(assignment.id, "earned", e.target.value)}
+                                className={`w-24 rounded-lg border bg-background px-3 py-2 text-sm text-foreground transition focus:outline-none focus:ring-2 ${
+                                  isChanged
+                                    ? "border-primary ring-1 ring-primary/40 focus:ring-primary/30"
+                                    : "border-border focus:border-primary focus:ring-primary/20"
+                                }`}
                                 step="1"
                                 min="0"
                               />
@@ -973,28 +1023,32 @@ export default function GradeCalculator() {
                               <input
                                 type="number"
                                 value={assignment.possible === "" ? "" : (assignment.possible || 0)}
-                                onChange={(e) => handleScoreChange(assignment.id, 'possible', e.target.value)}
+                                onChange={(e) => handleScoreChange(assignment.id, "possible", e.target.value)}
                                 onFocus={handleScoreFocus}
-                                onBlur={(e) => handleScoreBlur(assignment.id, 'possible', e.target.value)}
-                                className={`w-20 px-2 py-1 text-sm text-foreground bg-background border border-border rounded ${isChanged ? 'border-primary ring-1 ring-primary' : 'focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary'}`}
+                                onBlur={(e) => handleScoreBlur(assignment.id, "possible", e.target.value)}
+                                className={`w-24 rounded-lg border bg-background px-3 py-2 text-sm text-foreground transition focus:outline-none focus:ring-2 ${
+                                  isChanged
+                                    ? "border-primary ring-1 ring-primary/40 focus:ring-primary/30"
+                                    : "border-border focus:border-primary focus:ring-primary/20"
+                                }`}
                                 step="1"
                                 min="0"
                               />
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-foreground">{percent.toFixed(2)}%</td>
+                            <td className="px-4 py-3 text-sm font-semibold text-foreground">{percent.toFixed(2)}%</td>
                             <td className="px-4 py-3">
                               <div className="flex gap-2">
                                 {isChanged && (
                                   <button
                                     onClick={() => resetAssignment(assignment.id)}
-                                    className="text-sm text-primary hover:text-primary/80"
+                                    className="rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/10"
                                   >
                                     Reset
                                   </button>
                                 )}
                                 <button
                                   onClick={() => deleteAssignment(assignment.id)}
-                                  className="text-sm text-red-500 hover:text-red-600"
+                                  className="rounded-md border border-red-300 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
                                 >
                                   Delete
                                 </button>
@@ -1007,11 +1061,10 @@ export default function GradeCalculator() {
                   </table>
                 </div>
               </div>
-            </div>
+            </section>
           )}
         </div>
       </div>
-      
     </AppPageLayout>
   );
 }

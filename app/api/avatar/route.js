@@ -49,8 +49,10 @@ async function avatarHandler(request) {
     }
 
     const size = normalizeRequestedSize(szParam);
-    // Keep only the original image URL and apply consistent resizing server-side.
-    const normalizedUrl = `${parsedUrl.origin}${parsedUrl.pathname}`;
+    // Strip any existing Google size/transform suffix in the path, then apply
+    // a consistent size server-side with Sharp.
+    const cleanedPathname = parsedUrl.pathname.replace(/=[^/]*$/, "");
+    const normalizedUrl = `${parsedUrl.origin}${cleanedPathname}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), AVATAR_FETCH_TIMEOUT_MS);

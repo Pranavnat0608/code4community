@@ -42,7 +42,7 @@ export default function Contact() {
             <div>
               <h2 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">Response time</h2>
               <p className="text-muted-foreground">
-                We typically respond within 1–2 business days. For urgent matters, say so in the subject line.
+                We typically respond within 1 to 2 business days. For urgent matters, say so in the subject line.
               </p>
             </div>
             <div>

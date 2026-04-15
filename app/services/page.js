@@ -332,7 +332,7 @@ export default function Services() {
               rightContent={<WhatWeDeliverPanel />}
             />
             <SlideContent
-              leftText="We build it right, ship it, and stand behind it—so you can think bigger."
+              leftText="We build it right, ship it, and stand behind it, so you can think bigger."
               rightContent={
                 <div className="w-full max-w-md flex flex-col gap-3">
                   <div className="h-12 bg-blue-100 rounded-lg border border-blue-200 flex items-center px-4 text-blue-800 font-medium">Scope</div>
@@ -378,7 +378,7 @@ export default function Services() {
               {i === 2 && (
                 <SlideContent
                   fixedHeight
-                  leftText="We build it right, ship it, and stand behind it—so you can think bigger."
+                  leftText="We build it right, ship it, and stand behind it, so you can think bigger."
                   rightContent={
                     <div className="w-full max-w-md flex flex-col gap-3">
                       <div className="h-12 bg-blue-100 rounded-lg border border-blue-200 flex items-center px-4 text-blue-800 font-medium">Scope</div>

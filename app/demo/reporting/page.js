@@ -12,7 +12,7 @@ const kpis = [
 ];
 
 const programs = [
-  { name: "After-school tutoring", participants: 420, budget: "$85K", status: "On track" },
+  { name: "After school tutoring", participants: 420, budget: "$85K", status: "On track" },
   { name: "Community meals", participants: 1200, budget: "$120K", status: "On track" },
   { name: "Job readiness", participants: 380, budget: "$95K", status: "Ahead" },
   { name: "Youth mentorship", participants: 156, budget: "$45K", status: "On track" },
@@ -31,7 +31,7 @@ export default function ReportingDemo() {
     <div className="min-h-screen bg-muted/30">
       {/* Demo bar */}
       <div className="bg-foreground text-background px-4 py-2 flex items-center justify-between text-sm">
-        <span className="font-medium">Program Reporting — Demo</span>
+        <span className="font-medium">Program Reporting: Demo</span>
         <Link href="/" className="text-background/80 hover:text-white transition-colors">
           ← Back to Code4Community
         </Link>

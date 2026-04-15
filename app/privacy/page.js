@@ -39,10 +39,10 @@ export default function PrivacyPolicy() {
                   When you create an account or sign in, we collect and store:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>Email address</strong> — used to create and identify your account, send password-reset and account-related communications, and communicate with you about the Service</li>
-                  <li><strong>Display name and profile photo</strong> — if you sign in with a third-party provider (e.g., Google), we may receive and store the name and profile picture associated with that account for display within the Service</li>
-                  <li><strong>Authentication provider and identifiers</strong> — we store which method you used to sign up (e.g., email/password or Google) and a unique user identifier so we can authenticate you and link your activity to your account</li>
-                  <li><strong>Account creation and last sign-in timestamps</strong> — used for account management, security, and support</li>
+                  <li><strong>Email address</strong>: used to create and identify your account, send password reset and account related communications, and communicate with you about the Service</li>
+                  <li><strong>Display name and profile photo</strong>: if you sign in with an external provider (e.g., Google), we may receive and store the name and profile picture associated with that account for display within the Service</li>
+                  <li><strong>Authentication provider and identifiers</strong>: we store which method you used to sign up (e.g., email/password or Google) and a unique user identifier so we can authenticate you and link your activity to your account</li>
+                  <li><strong>Account creation and last sign in timestamps</strong>: used for account management, security, and support</li>
                 </ul>
               </div>
 
@@ -59,10 +59,10 @@ export default function PrivacyPolicy() {
                   We and our service providers automatically collect and store:
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
-                  <li><strong>IP address</strong> — for security, abuse prevention, and basic operation of the Service</li>
-                  <li><strong>Browser type, version, and device information</strong> — to ensure compatibility and troubleshoot issues</li>
-                  <li><strong>Log data</strong> — access logs, request metadata, and error logs necessary for operating, securing, and improving the Service</li>
-                  <li><strong>Usage information</strong> — such as which features or pages you access and when, to understand how the Service is used and to improve it</li>
+                  <li><strong>IP address</strong>: for security, abuse prevention, and basic operation of the Service</li>
+                  <li><strong>Browser type, version, and device information</strong>: to ensure compatibility and troubleshoot issues</li>
+                  <li><strong>Log data</strong>: access logs, request metadata, and error logs necessary for operating, securing, and improving the Service</li>
+                  <li><strong>Usage information</strong>: such as which features or pages you access and when, to understand how the Service is used and to improve it</li>
                 </ul>
               </div>
 
@@ -81,14 +81,14 @@ export default function PrivacyPolicy() {
                 <ul className="list-disc pl-6 space-y-2">
                   <li>Create, maintain, and secure your account and authenticate you</li>
                   <li>Provide, operate, and improve the Service and the features you use</li>
-                  <li>Send you account-related communications (e.g., password reset, important service notices)</li>
+                  <li>Send you account related communications (e.g., password reset, important service notices)</li>
                   <li>Respond to your requests and provide support</li>
                   <li>Detect, prevent, and address abuse, fraud, and security issues</li>
                   <li>Comply with applicable law and enforce our Terms of Service</li>
                   <li>Analyze usage in aggregate to improve performance and user experience</li>
                 </ul>
                 <p>
-                  We do not use your personal information for advertising or to build profiles for third-party marketing. We do not sell your personal information.
+                  We do not use your personal information for advertising or to build profiles for external marketing. We do not sell your personal information.
                 </p>
               </div>
             </section>
@@ -104,7 +104,7 @@ export default function PrivacyPolicy() {
               <h2 className="text-2xl font-semibold text-foreground mb-4">5. Third-Party Services</h2>
               <div className="text-muted-foreground leading-relaxed space-y-3">
                 <p>
-                  We use third-party services to operate the Service, including for authentication (e.g., Firebase/Google), hosting, and infrastructure. These providers process data on our behalf to provide the Service. Their handling of data is governed by their respective privacy policies and our agreements with them. We do not sell or share your personal information with third parties for their marketing purposes.
+                  We use outside services to operate the Service, including for authentication (e.g., Firebase/Google), hosting, and infrastructure. These providers process data on our behalf to provide the Service. Their handling of data is governed by their respective privacy policies and our agreements with them. We do not sell or share your personal information with other organizations for their marketing purposes.
                 </p>
               </div>
             </section>

@@ -308,4 +308,4 @@ export function buildApPrecalc11Session(n = 10) {
   return shuffle([...intervals, ...piecewise]);
 }
 
-export const AP_PRECALC_11_TITLE = "1.1 — Change in Tandem";
+export const AP_PRECALC_11_TITLE = "1.1: Change in Tandem";

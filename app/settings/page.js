@@ -213,7 +213,7 @@ export default function SettingsPage() {
               </p>
               <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                 <span>
-                  <span className="text-foreground font-medium">{user.displayName || "—"}</span>
+                  <span className="text-foreground font-medium">{user.displayName || "Not set"}</span>
                   <span className="mx-1.5 text-border">·</span>
                   <span>{user.email}</span>
                 </span>

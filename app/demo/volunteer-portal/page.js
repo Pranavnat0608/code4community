@@ -5,10 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 
 const opportunities = [
-  { title: "Food drive — Warehouse sorting", org: "Community Kitchen", date: "Sat, Mar 8", spots: "12 spots left", tag: "On-site" },
-  { title: "Tutoring — Math & reading", org: "After School Program", date: "Mon–Thu ongoing", spots: "3 spots left", tag: "Recurring" },
-  { title: "Event setup — Spring gala", org: "Arts Council", date: "Fri, Mar 15", spots: "8 spots left", tag: "One-time" },
-  { title: "Phone banking — Fundraiser", org: "Youth Center", date: "Tue, Mar 12", spots: "5 spots left", tag: "Remote" },
+  { title: "Food drive: Warehouse sorting", org: "Community Kitchen", date: "Sat, Mar 8", spots: "12 spots left", tag: "On site" },
+  { title: "Tutoring: Math and reading", org: "After School Program", date: "Mon to Thu ongoing", spots: "3 spots left", tag: "Recurring" },
+  { title: "Event setup: Spring gala", org: "Arts Council", date: "Fri, Mar 15", spots: "8 spots left", tag: "One time" },
+  { title: "Phone banking: Fundraiser", org: "Youth Center", date: "Tue, Mar 12", spots: "5 spots left", tag: "Remote" },
 ];
 
 export default function VolunteerPortalDemo() {
@@ -20,7 +20,7 @@ export default function VolunteerPortalDemo() {
     <div className="min-h-screen bg-muted/30">
       {/* Demo bar */}
       <div className="bg-foreground text-background px-4 py-2 flex items-center justify-between text-sm">
-        <span className="font-medium">Volunteer Portal — Demo</span>
+        <span className="font-medium">Volunteer Portal, Demo</span>
         <Link href="/" className="text-background/80 hover:text-white transition-colors">
           ← Back to Code4Community
         </Link>
@@ -96,8 +96,8 @@ export default function VolunteerPortalDemo() {
           </div>
           <div className="divide-y divide-border">
             {[
-              { role: "Warehouse sorting", org: "Community Kitchen", when: "Sat, Mar 8 · 9:00 AM – 12:00 PM" },
-              { role: "Tutoring — Math", org: "After School Program", when: "Mon, Mar 11 · 3:00 PM – 5:00 PM" },
+              { role: "Warehouse sorting", org: "Community Kitchen", when: "Sat, Mar 8, 9:00 AM to 12:00 PM" },
+              { role: "Tutoring: Math", org: "After School Program", when: "Mon, Mar 11, 3:00 PM to 5:00 PM" },
             ].map((s, i) => (
               <div key={i} className="px-6 py-4 flex items-center justify-between">
                 <div>

@@ -41,7 +41,7 @@ export default function DonorDashboardDemo() {
     <div className="min-h-screen bg-muted/30">
       {/* Demo bar */}
       <div className="bg-foreground text-background px-4 py-2 flex items-center justify-between text-sm">
-        <span className="font-medium">Donor Dashboard — Demo</span>
+        <span className="font-medium">Donor Dashboard: Demo</span>
         <Link href="/" className="text-background/80 hover:text-white transition-colors">
           ← Back to Code4Community
         </Link>

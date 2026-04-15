@@ -87,7 +87,7 @@ function StarBurstOverlay({ tier }) {
           {STAR_LABELS[tier]}
         </p>
         <p className="mt-1 text-sm text-white/85 text-center">
-          Keep going — you&apos;re building mastery.
+          Keep going. You&apos;re building mastery.
         </p>
       </div>
     </div>

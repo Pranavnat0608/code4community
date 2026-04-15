@@ -105,7 +105,7 @@ function SubjectSkillTable({ subject, weakness, mastery }) {
               <tr key={k} className="border-b border-border last:border-0">
                 <td className="px-3 py-2 text-foreground">{skillTagLabel(subject, k)}</td>
                 <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                  {score === null ? "—" : `${score}`}
+                  {score === null ? "N/A" : `${score}`}
                 </td>
                 <td className="px-3 py-2 tabular-nums text-muted-foreground">{misses}</td>
               </tr>
@@ -114,7 +114,7 @@ function SubjectSkillTable({ subject, weakness, mastery }) {
         </table>
       </div>
       <p className="text-xs text-muted-foreground mt-1">
-        Mastery is a 0–100 estimate with practice decay; it updates when you answer AI study questions.
+        Mastery is a 0 to 100 estimate with practice decay; it updates when you answer AI study questions.
       </p>
     </div>
   );
@@ -166,14 +166,14 @@ function SubjectSkillInsights({ subject, studyWeakness, studyMastery }) {
     <div className="space-y-3">
       {due.length > 0 && (
         <div className="rounded-lg border border-amber-200/80 dark:border-amber-800/80 bg-amber-50/80 dark:bg-amber-950/20 px-3 py-2 text-sm text-amber-950 dark:text-amber-100">
-          <span className="font-medium">{label} — due for review: </span>
+          <span className="font-medium">{label}: due for review: </span>
           {due.map((k) => skillTagLabel(subject, k)).join(" · ")}
         </div>
       )}
       {low.length > 0 && (
         <div className="rounded-lg border border-orange-200/80 dark:border-orange-900/60 bg-orange-50/70 dark:bg-orange-950/20 px-3 py-2 text-sm">
           <p className="font-medium text-orange-950 dark:text-orange-100 mb-1">
-            {label} — strengthen these skills
+            {label}: strengthen these skills
           </p>
           <ul className="list-disc list-inside text-orange-900/90 dark:text-orange-100/90 space-y-0.5">
             {low.slice(0, 6).map(({ tag, score }) => (

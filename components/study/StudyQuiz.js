@@ -424,7 +424,7 @@ export default function StudyQuiz({ user }) {
       setPmIntervalAnswer("");
       return;
     }
-    setError("Practice for this topic is coming soon. Try 1.1 — Change in Tandem for now.");
+    setError("Practice for this topic is coming soon. Try 1.1: Change in Tandem for now.");
   };
 
   const checkPrecalc11Current = () => {
@@ -975,7 +975,7 @@ export default function StudyQuiz({ user }) {
           />
           <p className="mt-6 text-sm font-medium text-foreground">Building your quiz…</p>
           <p className="mt-1.5 text-xs text-muted-foreground text-center max-w-xs">
-            Hang tight — this usually takes a few seconds.
+            Hang tight. This usually takes a few seconds.
           </p>
         </div>
       )}
@@ -988,7 +988,7 @@ export default function StudyQuiz({ user }) {
                 <div className="grid grid-cols-2 gap-3 max-w-lg">
                   {(
                     [
-                      { id: "math", label: "Math", hint: "AP Precalc · built-in" },
+                      { id: "math", label: "Math", hint: "AP Precalc, built in" },
                       { id: "science", label: "Science", hint: "AI from your notes" },
                       { id: "history", label: "History", hint: "Social studies" },
                       { id: "soon", label: "Coming soon", hint: "More subjects", disabled: true },
@@ -1032,7 +1032,7 @@ export default function StudyQuiz({ user }) {
                 <div>
                   <p className="text-sm font-medium text-foreground">Try the flow without AI</p>
                   <p className="text-xs text-muted-foreground">
-                    Three static questions — no Gemini, nothing saved to your stats.
+                    Three static questions, no Gemini, and nothing saved to your stats.
                   </p>
                 </div>
                 <button
@@ -1182,7 +1182,7 @@ export default function StudyQuiz({ user }) {
                       </p>
                       {ns.sessionResume && !ns.isDemo && (
                         <p className="text-xs text-primary mt-1.5 leading-snug">
-                          Saved progress — picks up the same questions (no new AI call).
+                          Saved progress, picks up the same questions (no new AI call).
                         </p>
                       )}
                       <button
@@ -1218,7 +1218,7 @@ export default function StudyQuiz({ user }) {
               <div className="min-w-0">
                 <h2 className="text-xl font-bold text-foreground">{AP_PRECALC_11_TITLE}</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Question {qi + 1} of {total} — procedural math (new numbers each run). Intervals + piecewise slopes.
+                  Question {qi + 1} of {total}: procedural math (new numbers each run). Intervals plus piecewise slopes.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1320,7 +1320,7 @@ export default function StudyQuiz({ user }) {
 
               {revealed && pmStuckSteps[qi] && (
                 <p className="text-sm text-muted-foreground">
-                  Answer shown — this counts as <strong>skipped</strong> in your stats.
+                  Answer shown. This counts as <strong>skipped</strong> in your stats.
                 </p>
               )}
               {revealed && !pmStuckSteps[qi] && (
@@ -1404,7 +1404,7 @@ export default function StudyQuiz({ user }) {
             <p className="text-sm text-muted-foreground">{pmSkipped} skipped (I&apos;m stuck)</p>
           )}
           <p className="text-muted-foreground text-sm">
-            AP Precalc 1.1 — Change in Tandem (programmatic, no AI).
+            AP Precalc 1.1: Change in Tandem (programmatic, no AI).
           </p>
           <button
             type="button"
@@ -1484,7 +1484,7 @@ export default function StudyQuiz({ user }) {
                           <span className="font-mono font-medium">{optionLetter(sel)}.</span> {yourOpt}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">No answer</span>
                       )}
                     </div>
                     <div>
@@ -1678,7 +1678,7 @@ export default function StudyQuiz({ user }) {
                   Prompt (notes)
                 </p>
                 <pre className="whitespace-pre-wrap break-words text-foreground bg-muted/40 rounded-lg p-3 text-xs max-h-40 overflow-y-auto border border-border/80">
-                  {inspectNoteSet.notes || "—"}
+                  {inspectNoteSet.notes || "No notes provided"}
                 </pre>
               </div>
               {inspectNoteSet.isDemo && inspectNoteSet.demoWeakness != null && (

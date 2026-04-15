@@ -68,7 +68,7 @@ export default function TermsOfService() {
                 </p>
                 <ul className="list-disc pl-6 space-y-2">
                   <li>You are responsible for the accuracy and lawfulness of any data you provide</li>
-                  <li>Tools and results are provided &quot;as is&quot;; you should verify results independently when used for official or high-stakes purposes</li>
+                  <li>Tools and results are provided &quot;as is&quot;; you should verify results independently when used for official or high stakes purposes</li>
                   <li>Data you submit through the Service may be stored and processed as described in our Privacy Policy</li>
                 </ul>
               </div>
@@ -91,7 +91,7 @@ export default function TermsOfService() {
             <section>
               <h2 className="text-2xl font-semibold text-foreground mb-4">8. Disclaimer of Warranties</h2>
               <p className="text-muted-foreground leading-relaxed">
-                The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. Code4Community disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, and non-infringement. We do not warrant that the Service will be uninterrupted, secure, or error-free. You use the Service at your own risk.
+                The Service is provided on an &quot;AS IS&quot; and &quot;AS AVAILABLE&quot; basis. Code4Community disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, and noninfringement. We do not warrant that the Service will be uninterrupted, secure, or error free. You use the Service at your own risk.
               </p>
             </section>
 

@@ -81,7 +81,7 @@ export default function AdminPage() {
       <div className="border-t border-border bg-muted/20 flex-1">
         <div className="max-w-4xl mx-auto px-6 pt-6 pb-10">
           <h1 className="text-2xl font-bold text-foreground mb-2">Admin dashboard</h1>
-          <p className="text-muted-foreground mb-6">Submitted get-started requests</p>
+          <p className="text-muted-foreground mb-6">Submitted get started requests</p>
 
           {error && (
             <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm mb-6">
@@ -105,7 +105,7 @@ export default function AdminPage() {
                       className="w-full text-left px-4 py-3 flex items-center justify-between gap-2 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset"
                     >
                       <span className="font-medium text-foreground">
-                        Request submitted by: {r.name || "—"}
+                        Request submitted by: {r.name || "Not provided"}
                       </span>
                       <svg
                         className={`w-5 h-5 shrink-0 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -121,17 +121,17 @@ export default function AdminPage() {
                         <dl className="grid gap-2 text-sm">
                           <div>
                             <dt className="text-muted-foreground font-medium">Date</dt>
-                            <dd className="text-foreground">{r.submittedAt ? new Date(r.submittedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "—"}</dd>
+                            <dd className="text-foreground">{r.submittedAt ? new Date(r.submittedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "Not provided"}</dd>
                           </div>
                           <div>
                             <dt className="text-muted-foreground font-medium">Email</dt>
                             <dd className="text-foreground">
-                              <a href={`mailto:${r.email}`} className="text-primary hover:underline">{r.email || "—"}</a>
+                              <a href={`mailto:${r.email}`} className="text-primary hover:underline">{r.email || "Not provided"}</a>
                             </dd>
                           </div>
                           <div>
                             <dt className="text-muted-foreground font-medium">Organization</dt>
-                            <dd className="text-foreground">{r.organization || "—"}</dd>
+                            <dd className="text-foreground">{r.organization || "Not provided"}</dd>
                           </div>
                           {r.need != null && r.need !== "" && (
                             <div>
@@ -141,11 +141,11 @@ export default function AdminPage() {
                           )}
                           <div>
                             <dt className="text-muted-foreground font-medium">Timeline</dt>
-                            <dd className="text-foreground">{r.timeline || "—"}</dd>
+                            <dd className="text-foreground">{r.timeline || "Not provided"}</dd>
                           </div>
                           <div>
                             <dt className="text-muted-foreground font-medium">Message</dt>
-                            <dd className="text-foreground whitespace-pre-wrap">{r.message || "—"}</dd>
+                            <dd className="text-foreground whitespace-pre-wrap">{r.message || "Not provided"}</dd>
                           </div>
                         </dl>
                       </div>

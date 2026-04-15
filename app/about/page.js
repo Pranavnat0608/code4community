@@ -26,7 +26,7 @@ const leadership = [
   },
   {
     name: "Pranav Natarajan",
-    role: "Co-President & Head of Outreach",
+    role: "Co President & Head of Outreach",
     image: "/pranav.jpg",
     bio: "Has over three years of experience in the product engineering industry. He collaborates with clients, plans and executes technical efforts aimed at software development, mediating between various departments, involving them in work, and coordinating activities.",
   },
@@ -157,7 +157,7 @@ export default function AboutUs() {
             <div className="relative mr-auto w-full max-w-[482px] overflow-hidden" style={{ aspectRatio: "482 / 316" }}>
               <Image
                 src="/c4c%20about%20us%20%281%29.png"
-                alt="Code4Community at Broad Run High School — school spirit on the fence"
+                alt="Code4Community at Broad Run High School, school spirit on the fence"
                 fill
                 className="object-cover object-center"
                 sizes="(max-width: 575px) 100vw, (max-width: 767px) 80vw, (max-width: 991px) 70vw, 50vw"

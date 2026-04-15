@@ -11,8 +11,8 @@ import FullPageLoading from "@/components/common/FullPageLoading";
 const TIMELINE_OPTIONS = [
   { value: "", label: "Select timeline…" },
   { value: "asap", label: "ASAP" },
-  { value: "1-3-months", label: "1–3 months" },
-  { value: "3-6-months", label: "3–6 months" },
+  { value: "1-3-months", label: "1 to 3 months" },
+  { value: "3-6-months", label: "3 to 6 months" },
   { value: "exploring", label: "Just exploring" },
 ];
 
@@ -156,7 +156,7 @@ export default function DashboardPage() {
             <div className="rounded-lg border border-border bg-muted/30 p-10 text-center">
               <p className="text-foreground font-medium mb-2">No services currently activated</p>
               <p className="text-muted-foreground text-sm mb-6">
-                Your account is set up. When you activate a service—such as donor management, volunteer platforms, or custom dashboards—it will appear here.
+                Your account is set up. When you activate a service, such as donor management, volunteer platforms, or custom dashboards, it will appear here.
               </p>
               <p className="text-muted-foreground text-sm">
                 Use the form below to request a tool or get in touch. You can also email{" "}
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               <ul className="space-y-2 mb-10">
                 {myRequests.map((r) => {
                   const isExpanded = expandedRequestId === r.id;
-                  const dateStr = r.submittedAt ? new Date(r.submittedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "—";
+                  const dateStr = r.submittedAt ? new Date(r.submittedAt).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" }) : "N/A";
                   return (
                     <li key={r.id} className="rounded-lg border border-border bg-background overflow-hidden">
                       <button
@@ -228,11 +228,11 @@ export default function DashboardPage() {
                             </div>
                             <div>
                               <dt className="text-muted-foreground font-medium">Email</dt>
-                              <dd className="text-foreground">{r.email || "—"}</dd>
+                              <dd className="text-foreground">{r.email || "N/A"}</dd>
                             </div>
                             <div>
                               <dt className="text-muted-foreground font-medium">Organization</dt>
-                              <dd className="text-foreground">{r.organization || "—"}</dd>
+                              <dd className="text-foreground">{r.organization || "N/A"}</dd>
                             </div>
                             {r.need != null && r.need !== "" && (
                               <div>
@@ -242,11 +242,11 @@ export default function DashboardPage() {
                             )}
                             <div>
                               <dt className="text-muted-foreground font-medium">Timeline</dt>
-                              <dd className="text-foreground">{r.timeline || "—"}</dd>
+                              <dd className="text-foreground">{r.timeline || "N/A"}</dd>
                             </div>
                             <div>
                               <dt className="text-muted-foreground font-medium">Message</dt>
-                              <dd className="text-foreground whitespace-pre-wrap">{r.message || "—"}</dd>
+                              <dd className="text-foreground whitespace-pre-wrap">{r.message || "N/A"}</dd>
                             </div>
                           </dl>
                         </div>
@@ -267,7 +267,7 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-border bg-muted/30 p-8 text-center">
                 <p className="text-foreground font-medium mb-2">Thanks for reaching out</p>
                 <p className="text-muted-foreground text-sm">
-                  We&apos;ve received your request and will get back to you within 1–2 business days.
+                  We&apos;ve received your request and will get back to you within 1 to 2 business days.
                 </p>
               </div>
             ) : (

@@ -131,7 +131,7 @@ export default function Home() {
             <span className="inline-block w-0.5 h-8 md:h-10 ml-0.5 bg-foreground animate-pulse align-middle" aria-hidden />
           </h1>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed mb-8 max-w-lg">
-            Code4Community is a student-led engineering club that builds <strong>custom tools and software</strong> for local nonprofits and small businesses <strong>at no cost.</strong>
+            Code4Community is a student led engineering club that builds <strong>custom tools and software</strong> for local nonprofits and small businesses <strong>at no cost.</strong>
           </p>
           <div className="flex flex-wrap gap-4">
             <Link
@@ -155,7 +155,7 @@ export default function Home() {
           <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: "linear-gradient(var(--foreground) 1px, transparent 1px), linear-gradient(90deg, var(--foreground) 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
           <div className="relative max-w-md mx-auto w-full">
             <h2 className="text-lg font-semibold text-foreground mb-1">We help you make</h2>
-            <p className="text-sm text-muted-foreground mb-6">Your idea, we build it—from concept to launch.</p>
+            <p className="text-sm text-muted-foreground mb-6">Your idea, we build it, from concept to launch.</p>
             <div className="grid grid-cols-2 gap-3">
               {buildItems.map((item) => (
                 <div
@@ -168,7 +168,7 @@ export default function Home() {
               ))}
             </div>
             <p className="text-xs text-muted-foreground mt-6 text-center">
-              Websites, volunteer management tools, event scheduling, donation dashboards, custom software—whatever your organization needs.
+              Websites, volunteer management tools, event scheduling, donation dashboards, and custom software, whatever your organization needs.
             </p>
           </div>
         </div>
@@ -302,7 +302,7 @@ export default function Home() {
             Some of Our Work
           </h2>
           <p className="text-center text-sm text-muted-foreground mb-8 max-w-xl mx-auto">
-            A few student-built tools we have shipped for teachers and the school community—grade tools, yearbook helpers, seating charts, and more to come.
+            A few student built tools we have shipped for teachers and the school community, including grade tools, yearbook helpers, seating charts, and more to come.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-5">
             {getFeaturedWorkProjects().map((p) => (

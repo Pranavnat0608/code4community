@@ -10,6 +10,7 @@ export default function SitemapPage() {
     { path: "/grade-calculator", title: "Grade Calculator", description: "Calculate your grades" },
     { path: "/yearbook-formatting", title: "Yearbook Formatting", description: "Format student names for yearbook captions" },
     { path: "/seating-chart", title: "Seating Chart", description: "Classroom seating charts and assignments" },
+    { path: "/student-groups", title: "Student Groups", description: "Balanced student groups with roster and export" },
     { path: "/contact", title: "Contact", description: "Get in touch with us" },
     { path: "/get-started", title: "Get Started", description: "Request a tool or get started with us" },
     { path: "/privacy", title: "Privacy Policy", description: "Privacy policy" },

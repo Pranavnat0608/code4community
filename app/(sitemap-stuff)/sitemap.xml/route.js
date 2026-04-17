@@ -42,6 +42,12 @@ export async function GET() {
       priority: 0.85,
     },
     {
+      url: `${baseUrl}/student-groups`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.85,
+    },
+    {
       url: `${baseUrl}/about`,
       lastModified: new Date(),
       changeFrequency: 'monthly',

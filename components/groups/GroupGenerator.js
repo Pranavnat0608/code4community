@@ -8,7 +8,7 @@ import GroupDisplay from "./GroupDisplay";
 import ExportTools from "./ExportTools";
 import ClassManager from "./ClassManager";
 
-export default function GroupGenerator() {
+export default function GroupGenerator({ embedded = false }) {
   const [students, setStudents] = useState([]);
   const [groups, setGroups] = useState([]);
   const [constraints, setConstraints] = useState({
@@ -150,8 +150,12 @@ export default function GroupGenerator() {
     }
   };
 
+  const shell = embedded
+    ? "bg-muted/40 rounded-xl border border-border p-4 md:p-6"
+    : "min-h-screen bg-gray-50 p-6";
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className={shell}>
       <div className="max-w-7xl mx-auto">
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Student Group Generator</h1>

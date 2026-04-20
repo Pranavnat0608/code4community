@@ -2,6 +2,38 @@
 
 import { useState, useRef } from "react";
 
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** True if this line is portal UI / nav text, not a student name. */
+function isTemplateNoiseLine(line, templateText) {
+  const lower = line.toLowerCase();
+  const trimLower = line.trim().toLowerCase();
+
+  for (const term of templateText) {
+    const t = term.toLowerCase();
+    if (term.includes(" ")) {
+      if (lower.includes(t)) return true;
+      continue;
+    }
+    // "English" alone is a language row; avoid matching surnames like "Jane English".
+    if (t === "english") {
+      if (trimLower === "english") return true;
+      continue;
+    }
+    // Short UI tokens must match as whole words only — substring match would drop names
+    // like "Ishanth Goli" ("Go" from the Search button) or "Hall" ("all").
+    if (term.length <= 4) {
+      const re = new RegExp(`\\b${escapeRegex(term)}\\b`, "i");
+      if (re.test(line)) return true;
+    } else if (lower.includes(t)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export default function StudentRosterManager({ students, onStudentsUpdate, onToggleAbsent }) {
   const [isParsing, setIsParsing] = useState(false);
   const [manualStudent, setManualStudent] = useState({ name: "", skills: [], performance: "medium" });
@@ -62,8 +94,8 @@ export default function StudentRosterManager({ students, onStudentsUpdate, onTog
         // Skip HTML tags
         if (/<[^>]+>/.test(line)) return false;
         
-        // Skip template text that appears in all Schoology class lists
-        if (templateText.some(term => line.toLowerCase().includes(term.toLowerCase()))) {
+        // Skip template text that appears in roster page UIs (Schoology, PowerSchool, etc.)
+        if (isTemplateNoiseLine(line, templateText)) {
           return false;
         }
         

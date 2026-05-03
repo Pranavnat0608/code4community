@@ -58,6 +58,12 @@ export default function Welcome() {
         isActive: true,
         path: "/student-groups",
       },
+      {
+        name: "Broad Run Club Hub",
+        description: "Club directory, engagement rankings, and calendar",
+        isActive: true,
+        path: "/club-hub",
+      },
       { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },
       { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },
       { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },

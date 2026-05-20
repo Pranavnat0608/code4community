@@ -58,6 +58,20 @@ export default function GradeCalculator() {
                             'Course History', 'Grade Book', 'MTSS', 'School Information', 
                             'Student Info', 'Test History', 'Documents', 'Totals'];
 
+    // Synergy uses lines like "Major Summative" as categories but assignment titles can include "Summative" (e.g. "Summative Polar").
+    const isSynergyCategoryHeaderLine = (s) =>
+      /^(Major|Minor|Graded|Diagnostic)\s+(Summative|Formative)\b/i.test(s.trim());
+    const isSynergyScoreMetadataLine = (s) =>
+      /^(Raw\s+Score|Percentage)\b/i.test(s.trim());
+    const isPlausibleAssignmentTitleLine = (s) => {
+      const t = s.trim();
+      if (!t || t.length < 3) return false;
+      if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t)) return false;
+      if (isSynergyCategoryHeaderLine(t)) return false;
+      if (isSynergyScoreMetadataLine(t)) return false;
+      return true;
+    };
+
     // Find course name and overall grade (appears early in the text)
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
@@ -237,8 +251,8 @@ export default function GradeCalculator() {
               break;
             }
             
-            // Extract assignment name (first substantial non-category text)
-            if (!nameFound && !nextLine.match(/(Major|Minor|Graded|Summative|Formative|Diagnostic)/i)) {
+            // Extract assignment name (first substantial line that is not a category or "Raw Score" metadata)
+            if (!nameFound && isPlausibleAssignmentTitleLine(nextLine)) {
               // Check if it's tab-separated
               const tabParts = nextLine.split('\t');
               if (tabParts.length > 0) {
@@ -338,9 +352,7 @@ export default function GradeCalculator() {
               // Look back a few lines for potential name
               for (let k = Math.max(0, i - 3); k < i; k++) {
                 const prevLine = lines[k].trim();
-                if (prevLine && !prevLine.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}/) && 
-                    !prevLine.match(/(Major|Minor|Graded|Summative|Formative)/i) &&
-                    prevLine.length > 2) {
+                if (prevLine && isPlausibleAssignmentTitleLine(prevLine)) {
                   assignmentName = prevLine.split('\t')[0].trim();
                   if (assignmentName && !navigationItems.includes(assignmentName)) {
                     break;
@@ -452,8 +464,7 @@ export default function GradeCalculator() {
             let assignmentName = "";
             for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
               const nextLine = lines[j].trim();
-              if (nextLine && !nextLine.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}/) && 
-                  !nextLine.match(/(Major|Minor|Graded|Summative|Formative)/i) &&
+              if (nextLine && isPlausibleAssignmentTitleLine(nextLine) &&
                   !nextLine.match(/out of/i) && nextLine.length > 2) {
                 assignmentName = nextLine.split('\t')[0].trim();
                 break;

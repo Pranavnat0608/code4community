@@ -21,12 +21,9 @@ export default function StudyPage() {
       router.replace("/login");
       return;
     }
-    if (!user.emailVerified) {
-      router.replace("/verify-email");
-    }
   }, [user, authLoading, router]);
 
-  if (authLoading || !user || !user.emailVerified) {
+  if (authLoading || !user) {
     return <FullPageLoading />;
   }
 

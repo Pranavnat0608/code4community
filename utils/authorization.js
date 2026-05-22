@@ -1,5 +1,6 @@
 // Authorization utility functions
 import { isAdminEmail } from '@/config/admin';
+import { normalizeEmail } from '@/lib/email';
 
 // User roles
 export const ROLES = {
@@ -119,7 +120,7 @@ export const isAdmin = (userRole) => {
 
 // Check if user is admin by email (for hardcoded admin)
 export const isAdminByEmail = (email) => {
-  return isAdminEmail(email);
+  return isAdminEmail(normalizeEmail(email));
 };
 
 // Check if user is admin by role or email

@@ -37,6 +37,11 @@ body {
   min-height: 100%;
 }
 
+/* Math Lab: fixed sidebar sits below sticky top bar (desktop) */
+:root {
+  --mathlab-header-height: 5.5rem;
+}
+
 /* Scrollbar: thin and subtle (not a bright white bar) */
 html {
   scrollbar-width: thin;

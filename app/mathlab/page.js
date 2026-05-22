@@ -11,6 +11,7 @@ import { firestore } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance } from "@/utils/cache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
 import { canAccess, canModify, isTutorOrHigher, isAdminUser, ROLES } from "@/utils/authorization";
+import { mathlabLoginPath } from "@/utils/mathlabGuest";
 import Image from "next/image";
 
 // Component for live updating session timer
@@ -47,7 +48,8 @@ function ActiveSessionTimer({ startTime }) {
 }
 
 function MathLabPageContent() {
-  const { user, userData, isEmailVerified, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
+  const isGuest = !user;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -241,13 +243,22 @@ function MathLabPageContent() {
     }
   }, [userData, user]);
 
-  // Use cached user if available, fallback to real userData - memoized for performance
-  const displayUser = useMemo(() => userData || cachedUser, [userData, cachedUser]);
+  const displayUser = useMemo(
+    () => (user ? userData || cachedUser : null),
+    [user, userData, cachedUser],
+  );
   
   // Helper function to check if user is a tutor (including admins who can also tutor)
   const isTutor = useMemo(() => {
     return displayUser?.mathLabRole === 'tutor' || isAdminUser(displayUser?.role, user?.email);
   }, [displayUser?.mathLabRole, displayUser?.role, user?.email]);
+
+  const isStudentViewRoute = searchParams?.get("view") === "student";
+  const hasActiveStudentRequest =
+    studentRequest &&
+    (studentRequest.status === "pending" || studentRequest.status === "accepted");
+  const tutorDashboardBlocked =
+    !isGuest && isTutor && !isStudentViewRoute && hasActiveStudentRequest;
   
   // Check if user is admin
   const isAdmin = useMemo(() => {
@@ -381,22 +392,8 @@ function MathLabPageContent() {
     }
   }, [isAdmin, fetchActiveSessions]);
 
-  // Redirect to login if not authenticated (use cached user if available)
-  useEffect(() => {
-    if (!user && !cachedUser) {
-      router.push('/login?redirectTo=/mathlab');
-    }
-  }, [user, cachedUser, router]);
-
   // Check authorization for Math Lab access
   const isAuthorized = user && userData && canAccess(userData.role, 'mathlab', userData.mathLabRole);
-
-  // Redirect to email verification if email is not verified
-  useEffect(() => {
-    if (userData && !isEmailVerified) {
-      router.push('/verify-email?email=' + encodeURIComponent(userData.email));
-    }
-  }, [userData, isEmailVerified, router]);
 
   // Fetch pending requests if user is a tutor
   useEffect(() => {
@@ -474,9 +471,14 @@ function MathLabPageContent() {
     };
   }, [activeSession, sessionStartTime, studentRequest, sessionStatus]);
 
-  // Check for student requests
+  // Check for student requests (any user who submitted as a student, including tutors)
   useEffect(() => {
-    if (displayUser?.mathLabRole === 'student') {
+    const studentUid = user?.uid || cachedUser?.uid;
+    if (!studentUid) {
+      setStudentRequest(null);
+      return;
+    }
+
       const checkStudentRequest = async () => {
         try {
           console.log('[StudentRequest] Checking for student requests:', user?.uid || cachedUser?.uid);
@@ -668,15 +670,7 @@ function MathLabPageContent() {
       return () => {
         unsubscribe();
       };
-    } else {
-      // If not a student, clear any existing student request state
-      setStudentRequest(null);
-    }
-  }, [
-    displayUser?.mathLabRole, 
-    user?.uid, 
-    cachedUser?.uid
-  ]);
+  }, [user?.uid, cachedUser?.uid, displayUser?.displayName, user?.email]);
 
   // No dropdown overlay logic needed with native select
 
@@ -690,8 +684,13 @@ function MathLabPageContent() {
       return;
     }
 
+    if (!user) {
+      router.push(mathlabLoginPath("/mathlab"));
+      return;
+    }
+
     // Check authorization
-    if (!canModify(userData.role, 'mathlab', userData.mathLabRole)) {
+    if (!userData || !canModify(userData.role, "mathlab", userData.mathLabRole)) {
       console.error('Unauthorized: User cannot create math lab requests');
       alert("You don't have permission to create requests.");
       return;
@@ -1053,19 +1052,16 @@ function MathLabPageContent() {
     );
   }
 
-  // Redirect to login if not authenticated
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
-
-  // Don't show loading state - use cached data immediately
-  if (!displayUser) {
-    return null; // Will redirect to login
+  if (!isGuest && !displayUser) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   // Show access denied if not authorized
-  if (user && userData && !isAuthorized) {
+  if (!isGuest && user && userData && !isAuthorized) {
     return (
       <div className="min-h-screen bg-background">
         <DashboardTopBar />
@@ -1191,8 +1187,63 @@ function MathLabPageContent() {
     );
   }
 
-  // Show student matching screen if they have a pending request
-  if (studentRequest && displayUser?.mathLabRole === 'student') {
+  // Tutor with an active student request cannot open the tutor dashboard until it is cleared
+  if (tutorDashboardBlocked) {
+    return (
+      <div className="min-h-screen bg-background">
+        <DashboardTopBar title="BRHS Math Lab" showNavLinks={false} />
+        <Suspense fallback={null}>
+          <MathLabSidebar />
+        </Suspense>
+        <div
+          className="flex-1 flex items-center justify-center px-4 py-12 ml-0 md:ml-16 pb-16 md:pb-12"
+          style={{ minHeight: "calc(100vh - 80px)" }}
+        >
+          <div className="max-w-lg w-full card-elevated p-8 rounded-2xl text-center">
+            <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-5">
+              <svg className="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-3">Active tutoring request</h1>
+            <p className="text-muted-foreground mb-6">
+              You have a current request as a student for{" "}
+              <span className="font-medium text-foreground">{studentRequest.course}</span>.
+              {studentRequest.status === "pending"
+                ? " Cancel it to access the tutor dashboard."
+                : " Manage it from Math Lab before accepting requests as a tutor."}
+            </p>
+            <div className="flex flex-col gap-3">
+              {studentRequest.status === "pending" && (
+                <button
+                  type="button"
+                  onClick={handleCancelRequest}
+                  className="w-full py-3 px-4 bg-foreground text-background font-medium rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Cancel request
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => router.push("/mathlab?view=student")}
+                className="w-full py-3 px-4 border border-border rounded-lg font-medium hover:bg-muted/50 transition-colors"
+              >
+                Go to Math Lab
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Student matching / session UI (students and tutors on ?view=student)
+  if (hasActiveStudentRequest && (!isTutor || isStudentViewRoute)) {
     // If session is started, show the same detailed screen as tutor
     if (sessionStatus === 'started') {
       return (
@@ -1691,7 +1742,7 @@ function MathLabPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
+    <div className="min-h-screen bg-background" style={{ overscrollBehavior: "none" }}>
       {/* Use the reusable DashboardTopBar component */}
       <DashboardTopBar 
         title="BRHS Math Lab" 
@@ -1721,7 +1772,7 @@ function MathLabPageContent() {
 
       {/* Main Content */}
       <div className="flex-1 flex items-center justify-center ml-0 md:ml-16 pb-16 md:pb-0" style={{ minHeight: 'calc(100vh - 80px)' }}>
-        {(isTutor && searchParams?.get('view') !== 'student') ? (
+        {!isGuest && isTutor && !isStudentViewRoute ? (
           // Tutor Dashboard - Redesigned with Horizontal Grid
           <div className="max-w-7xl w-full mx-4">
             {/* Header Section */}

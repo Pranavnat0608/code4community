@@ -40,16 +40,29 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
   const publicNavLinks = [
     { label: "HOME", path: "/" },
     { label: "ABOUT US", path: "/about" },
-    { label: "SERVICES", path: "/services" },
     { label: "WORK", path: "/work" },
     { label: "CONTACT", path: "/contact" },
   ];
   const navLinks = publicNavLinks;
+  const isMathLabBar = !showNavLinks;
+  const headerSticky = isMathLabBar
+    ? "sticky top-0 z-50 bg-background shadow-sm"
+    : pathname === "/" || pathname === "/services" || pathname === "/work"
+      ? "relative z-40"
+      : "relative z-40 mb-6";
 
   return (
     <>
-      <MobileTopBar title={title} showNavLinks={showNavLinks} />
-      <header className={`hidden md:block bg-background border-b border-border px-6 py-4 relative z-40 ${pathname === '/' || pathname === '/services' || pathname === '/work' ? 'mb-0' : 'mb-6'}`}>
+      {isMathLabBar ? (
+        <div className="md:hidden sticky top-0 z-50 bg-background border-b border-border">
+          <MobileTopBar title={title} showNavLinks={showNavLinks} />
+        </div>
+      ) : (
+        <MobileTopBar title={title} showNavLinks={showNavLinks} />
+      )}
+      <header
+        className={`hidden md:block border-b border-border px-6 py-4 bg-background ${headerSticky}`}
+      >
         <div className="container mx-auto">
           <div className="flex items-center justify-between">
             {/* Logo and Title on Left */}

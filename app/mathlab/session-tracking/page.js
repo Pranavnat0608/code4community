@@ -9,9 +9,10 @@ import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { firestore } from "@/firebase";
 import { UserCache, MathLabCache, CachePerformance } from "@/utils/cache";
 import { isAdminUser } from "@/utils/authorization";
+import MathLabLoginPrompt from "@/components/MathLabLoginPrompt";
 
 function SessionTrackingPageContent() {
-  const { user, userData, isEmailVerified, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   const router = useRouter();
   const [cachedUser, setCachedUser] = useState(null);
   const [sessions, setSessions] = useState([]);
@@ -49,13 +50,6 @@ function SessionTrackingPageContent() {
     }
   }, [userData, user]);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!loading && !user && !cachedUser) {
-      router.push('/login?redirectTo=/mathlab/session-tracking');
-    }
-  }, [user, cachedUser, loading, router]);
-
   // Check if user is admin
   const isAdmin = userData && user && isAdminUser(userData.role, user.email);
 
@@ -65,13 +59,6 @@ function SessionTrackingPageContent() {
       router.push('/mathlab');
     }
   }, [loading, userData, isAdmin, router]);
-
-  // Redirect to email verification if email is not verified
-  useEffect(() => {
-    if (userData && !isEmailVerified) {
-      router.push('/verify-email?email=' + encodeURIComponent(userData.email));
-    }
-  }, [userData, isEmailVerified, router]);
 
   // Fetch all completed sessions
   const fetchSessions = useCallback(async (forceRefresh = false) => {
@@ -179,6 +166,16 @@ function SessionTrackingPageContent() {
     }
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
+
+  if (!loading && !user) {
+    return (
+      <MathLabLoginPrompt
+        redirectTo="/mathlab/session-tracking"
+        title="Sign in to view session tracking"
+        description="Session tracking is available to admins after you log in."
+      />
+    );
+  }
 
   if (loading || isLoading) {
     return (

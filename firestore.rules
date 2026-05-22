@@ -19,6 +19,14 @@
       function isValidEmail(email) {
         return email is string && email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
       }
+
+      function normalizeEmail(email) {
+        return email is string ? email.lower() : '';
+      }
+
+      function emailsMatch(a, b) {
+        return normalizeEmail(a) == normalizeEmail(b) && normalizeEmail(a) != '';
+      }
       
       function isValidRole(role) {
         return role in ['student', 'teacher', 'admin'];
@@ -38,8 +46,52 @@
       
       function isAdminByEmail() {
         return isAuthenticated() &&
-              (request.auth.token.email == '1021676@lcps.org' ||
-                request.auth.token.email == 'shail40926@gmail.com');
+              request.auth.token.email is string &&
+              normalizeEmail(request.auth.token.email) in
+                ['1021676@lcps.org', 'shail40926@gmail.com'];
+      }
+
+      function isProtectedAdminEmail(email) {
+        return normalizeEmail(email) in ['1021676@lcps.org', 'shail40926@gmail.com'];
+      }
+
+      function isFirestoreAdmin() {
+        return isAuthenticated() &&
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      }
+
+      function isAnyAdmin() {
+        return isAdminByEmail() || isFirestoreAdmin();
+      }
+
+      function mathLabRoleValue(data) {
+        return ('mathLabRole' in data && data.mathLabRole is string) ? data.mathLabRole : '';
+      }
+
+      function pendingTeamDocPath(email) {
+        return /databases/$(database)/documents/mathLabTeamPending/$(email);
+      }
+
+      function hasPendingAdminGrant() {
+        return isAuthenticated() &&
+              request.resource.data.email is string &&
+              exists(pendingTeamDocPath(normalizeEmail(request.resource.data.email))) &&
+              get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'admin';
+      }
+
+      function hasPendingTutorGrant() {
+        return isAuthenticated() &&
+              request.resource.data.email is string &&
+              exists(pendingTeamDocPath(normalizeEmail(request.resource.data.email))) &&
+              get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'tutor';
+      }
+
+      function protectedAdminTeamFieldsUnchanged() {
+        return !('email' in resource.data) ||
+              !isProtectedAdminEmail(resource.data.email) ||
+              (request.resource.data.role == resource.data.role &&
+                mathLabRoleValue(request.resource.data) == mathLabRoleValue(resource.data));
       }
       
       // Helper function to check if user is a tutor (by mathLabRole or admin role)
@@ -70,7 +122,7 @@
       // Users collection - Contains user profile data
       match /users/{userId} {
         // Allow read: Own document or admins can read all
-        allow read: if isAuthenticated() && (isOwner(userId) || isAdminByEmail());
+        allow read: if isAuthenticated() && (isOwner(userId) || isAnyAdmin());
         
         // Allow create: During signup process
         allow create: if isAuthenticated() && 
@@ -87,10 +139,20 @@
                         isValidRole(request.resource.data.role) &&
                         request.resource.data.createdAt is timestamp &&
                         request.resource.data.updatedAt is timestamp &&
-                        // Ensure user can only set their own email
-                        request.resource.data.email == request.auth.token.email &&
-                        // Allow admin role for admin emails, otherwise default to student
-                        (isAdminByEmail() || request.resource.data.role == 'student');
+                        // Email must match auth (case-insensitive); stored profile email is lowercase
+                        request.resource.data.email is string &&
+                        request.resource.data.email == normalizeEmail(request.resource.data.email) &&
+                        emailsMatch(request.resource.data.email, request.auth.token.email) &&
+                        // Allow admin role for built-in admins, pending grants, or default student
+                        (isAdminByEmail() ||
+                          request.resource.data.role == 'student' ||
+                          (request.resource.data.role == 'admin' && hasPendingAdminGrant())) &&
+                        // mathLabRole on signup: empty, or tutor when pre-approved
+                        (!('mathLabRole' in request.resource.data) ||
+                          (request.resource.data.mathLabRole is string &&
+                            isValidMathLabRole(request.resource.data.mathLabRole) &&
+                            (request.resource.data.mathLabRole == '' ||
+                              (request.resource.data.mathLabRole == 'tutor' && hasPendingTutorGrant()))));
         
         // Allow update: Own document with restrictions, or admin updates
         allow update: if isAuthenticated() && (
@@ -115,8 +177,8 @@
                           (!('photoURL' in request.resource.data) || 
                             (request.resource.data.photoURL is string && 
                             request.resource.data.photoURL.size() <= 500))) ||
-                          // Admin updates (can modify any user)
-                          isAdminByEmail()
+                          // Admin updates (can modify any user; built-in admins are protected)
+                          (isAnyAdmin() && protectedAdminTeamFieldsUnchanged())
                         );
         
         // Allow delete: Only admins can delete users
@@ -309,6 +371,23 @@
         
         // Allow delete: Only teachers/admins can delete completed sessions
         allow delete: if isTeacherOrAdmin() || isAdminByEmail();
+      }
+
+      // Pre-signup tutor/admin grants (document id = normalized email)
+      match /mathLabTeamPending/{emailKey} {
+        allow read: if isAuthenticated() &&
+                      (isAnyAdmin() || emailsMatch(request.auth.token.email, emailKey));
+        allow create, update: if isAnyAdmin() &&
+                                request.resource.data.keys().hasAll(['email', 'grantType', 'createdAt', 'updatedAt']) &&
+                                request.resource.data.email is string &&
+                                normalizeEmail(request.resource.data.email) == normalizeEmail(emailKey) &&
+                                isValidEmail(request.resource.data.email) &&
+                                request.resource.data.grantType in ['tutor', 'admin'] &&
+                                request.resource.data.createdAt is timestamp &&
+                                request.resource.data.updatedAt is timestamp &&
+                                !isProtectedAdminEmail(request.resource.data.email);
+        allow delete: if isAnyAdmin() ||
+                        (isAuthenticated() && emailsMatch(request.auth.token.email, emailKey));
       }
 
       // Deny all other collections and documents

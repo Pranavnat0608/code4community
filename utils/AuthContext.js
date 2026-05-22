@@ -9,10 +9,17 @@ import {
   useMemo,
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { auth, firestore } from "@/firebase";
 import { UserCache, CachePerformance } from "@/utils/cache";
 import { isAdminEmail } from "@/config/admin";
+import { lookupBroadRunName } from "@/lib/broadRunRoster";
+import {
+  applyPendingGrantToProfile,
+  MATHLAB_TEAM_PENDING_COLLECTION,
+  pendingTeamDocId,
+} from "@/lib/mathlabTeamPending";
+import { normalizeEmail } from "@/lib/email";
 
 const AuthContext = createContext({ user: null, userData: null, loading: true });
 
@@ -43,28 +50,63 @@ export function AuthProvider({ children }) {
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const userDataWithUid = { ...data, uid: currentUser.uid };
+        const normalizedEmail = normalizeEmail(data.email || currentUser.email);
+        if (data.email && data.email !== normalizedEmail) {
+          try {
+            await updateDoc(docRef, { email: normalizedEmail, updatedAt: serverTimestamp() });
+            data.email = normalizedEmail;
+          } catch (migrateErr) {
+            console.warn("[AuthContext] could not normalize stored email", migrateErr);
+          }
+        }
+        const userDataWithUid = { ...data, email: normalizedEmail, uid: currentUser.uid };
         UserCache.setUserData(userDataWithUid);
         setLastFetchTime(Date.now());
         CachePerformance.endTiming(timing);
         return userDataWithUid;
       }
 
+      const normalizedEmail = normalizeEmail(currentUser.email);
+      const rosterName = lookupBroadRunName(normalizedEmail);
       const displayName =
+        rosterName ||
         (currentUser.displayName && currentUser.displayName.trim()) ||
-        (currentUser.email && currentUser.email.split("@")[0]) ||
+        (normalizedEmail && normalizedEmail.split("@")[0]) ||
         "User";
-      const role = isAdminEmail(currentUser.email) ? "admin" : "student";
+      let role = isAdminEmail(normalizedEmail) ? "admin" : "student";
+      let mathLabRole = "";
+      const pendingRef = doc(
+        firestore,
+        MATHLAB_TEAM_PENDING_COLLECTION,
+        pendingTeamDocId(normalizedEmail),
+      );
+      const pendingSnap = await getDoc(pendingRef);
+      if (pendingSnap.exists()) {
+        const withPending = applyPendingGrantToProfile(
+          pendingSnap.data(),
+          { role, mathLabRole },
+          normalizedEmail,
+        );
+        role = withPending.role;
+        mathLabRole = withPending.mathLabRole;
+      }
       const newProfile = {
-        email: currentUser.email,
+        email: normalizedEmail,
         displayName,
         photoURL: currentUser.photoURL || "",
         role,
-        mathLabRole: "",
+        mathLabRole,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
       await setDoc(docRef, newProfile);
+      if (pendingSnap.exists()) {
+        try {
+          await deleteDoc(pendingRef);
+        } catch (pendingErr) {
+          console.warn("[AuthContext] could not clear pending team grant", pendingErr);
+        }
+      }
       const again = await getDoc(docRef);
       if (again.exists()) {
         const userDataWithUid = { ...again.data(), uid: currentUser.uid };
@@ -154,55 +196,6 @@ export function AuthProvider({ children }) {
   }, [fetchUserData]);
 
   useEffect(() => {
-    if (!auth || !firestore) {
-      return;
-    }
-
-    const applyVerifiedState = async () => {
-      try {
-        if (auth.currentUser) {
-          await auth.currentUser.reload();
-          setUser(auth.currentUser);
-          const freshData = await fetchUserData(auth.currentUser, true);
-          if (freshData) {
-            setUserData(freshData);
-            setLastFetchTime(Date.now());
-          }
-          localStorage.removeItem("emailVerificationStatus");
-        }
-      } catch (error) {
-        console.error("[AuthContext] applyVerifiedState", {
-          error: error.message,
-          code: error.code,
-        });
-      }
-    };
-
-    const handleEmailVerifiedEvent = () => {
-      applyVerifiedState();
-    };
-
-    const handleStorage = (event) => {
-      if (event.key === "emailVerificationStatus" && event.newValue === "verified") {
-        applyVerifiedState();
-      }
-    };
-
-    const verificationStatus = localStorage.getItem("emailVerificationStatus");
-    if (verificationStatus === "verified") {
-      applyVerifiedState();
-    }
-
-    window.addEventListener("emailVerified", handleEmailVerifiedEvent);
-    window.addEventListener("storage", handleStorage);
-
-    return () => {
-      window.removeEventListener("emailVerified", handleEmailVerifiedEvent);
-      window.removeEventListener("storage", handleStorage);
-    };
-  }, [fetchUserData]);
-
-  useEffect(() => {
     const handleRoleChange = async (event) => {
       if (user && event.detail.userId === user.uid) {
         const freshData = await fetchUserData(user, true);
@@ -241,7 +234,7 @@ export function AuthProvider({ children }) {
       getRedirectUrl,
       refreshUserData,
       lastFetchTime,
-      isEmailVerified: user?.emailVerified || false,
+      isEmailVerified: true,
     }),
     [user, userData, loading, refreshUserData, lastFetchTime],
   );

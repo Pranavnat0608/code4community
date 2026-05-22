@@ -9,9 +9,10 @@ import { doc, collection, query, where, getDocs, orderBy, limit } from "firebase
 import { firestore } from "@/firebase";
 import { MathLabCache, UserCache, CachePerformance } from "@/utils/cache";
 import { canAccess, isAdminUser } from "@/utils/authorization";
+import MathLabLoginPrompt from "@/components/MathLabLoginPrompt";
 
 function MathLabHistoryPageContent() {
-  const { user, userData, isEmailVerified } = useAuth();
+  const { user, userData } = useAuth();
   const router = useRouter();
   const [cachedUser, setCachedUser] = useState(null);
   const [sessionHistory, setSessionHistory] = useState([]);
@@ -60,22 +61,8 @@ function MathLabHistoryPageContent() {
     }
   }, [userData, user]);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!user && !cachedUser) {
-      router.push('/login?redirectTo=/mathlab/history');
-    }
-  }, [user, cachedUser, router]);
-
   // Check authorization for Math Lab access
   const isAuthorized = user && userData && canAccess(userData.role, 'mathlab', userData.mathLabRole);
-
-  // Redirect to email verification if email is not verified
-  useEffect(() => {
-    if (userData && !isEmailVerified) {
-      router.push('/verify-email?email=' + encodeURIComponent(userData.email));
-    }
-  }, [userData, isEmailVerified, router]);
 
   // Fetch session history
   const fetchSessionHistory = useCallback(async (forceRefresh = false) => {
@@ -248,14 +235,28 @@ function MathLabHistoryPageContent() {
   // Use cached user if available, fallback to real userData
   const displayUser = userData || cachedUser;
 
+  if (!user) {
+    return (
+      <MathLabLoginPrompt
+        redirectTo="/mathlab/history"
+        title="Sign in to view session history"
+        description="Your past tutoring sessions appear here after you log in with your school account."
+      />
+    );
+  }
+
   if (!displayUser) {
-    return null; // Will redirect to login
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   // Show access denied if not authorized
   if (user && userData && !isAuthorized) {
     return (
-      <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
+      <div className="min-h-screen bg-background " style={{ overscrollBehavior: 'none' }}>
         <DashboardTopBar title="Math Lab History" showNavLinks={false} />
         <div className="container mx-auto px-6 py-8">
           <div className="text-center">
@@ -268,7 +269,7 @@ function MathLabHistoryPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden" style={{ overscrollBehavior: 'none' }}>
+    <div className="min-h-screen bg-background " style={{ overscrollBehavior: 'none' }}>
       <DashboardTopBar title="Math Lab History" showNavLinks={false} />
       <Suspense fallback={null}>
         <MathLabSidebar />

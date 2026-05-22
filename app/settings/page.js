@@ -54,10 +54,6 @@ export default function SettingsPage() {
       router.replace("/login");
       return;
     }
-    if (!user.emailVerified) {
-      router.replace("/verify-email");
-      return;
-    }
     setName(user.displayName || "");
   }, [user, authLoading, router]);
 
@@ -190,7 +186,7 @@ export default function SettingsPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [personalModalOpen, closePersonalModal]);
 
-  if (authLoading || !user || !user.emailVerified) {
+  if (authLoading || !user) {
     return <FullPageLoading />;
   }
 

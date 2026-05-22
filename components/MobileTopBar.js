@@ -10,7 +10,6 @@ import { auth, signOut } from "@/firebase";
 const BASE_NAV_LINKS = [
   { label: "HOME", path: "/" },
   { label: "ABOUT US", path: "/about" },
-  { label: "SERVICES", path: "/services" },
   { label: "WORK", path: "/work" },
   { label: "CONTACT", path: "/contact" },
 ];
@@ -112,7 +111,13 @@ export default function MobileTopBar({ title = "Code4Community", showNavLinks = 
   return (
     <>
       {/* Top bar: always same layout */}
-      <header className={`md:hidden relative z-40 ${pathname === "/" || pathname === "/services" || pathname === "/work" ? "mb-0" : "mb-6"}`}>
+      <header
+        className={`md:hidden relative z-40 ${
+          !showNavLinks || pathname === "/" || pathname === "/services" || pathname === "/work"
+            ? "mb-0"
+            : "mb-6"
+        }`}
+      >
         <TopBarContent isMenuOpen={false} />
       </header>
 

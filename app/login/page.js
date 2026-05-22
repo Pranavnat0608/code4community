@@ -8,6 +8,7 @@ import { AppPageLayout, CenteredMain } from "@/components/common/AppPageLayout";
 import FullPageLoading from "@/components/common/FullPageLoading";
 import { useAuth } from "@/utils/AuthContext";
 import { auth, provider, signInWithEmailAndPassword, signInWithPopup } from "@/firebase";
+import { normalizeEmail } from "@/lib/email";
 
 function safeRedirectTarget() {
   if (typeof window === "undefined") return null;
@@ -32,11 +33,7 @@ export default function LoginPage() {
   useEffect(() => {
     if (!authLoading && user) {
       const next = safeRedirectTarget();
-      if (user.emailVerified) {
-        router.replace(next || "/");
-      } else {
-        router.replace("/verify-email");
-      }
+      router.replace(next || "/");
     }
   }, [user, authLoading, router]);
 
@@ -45,13 +42,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const { user: signedInUser } = await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
       const next = safeRedirectTarget();
-      if (signedInUser.emailVerified) {
-        router.push(next || "/");
-      } else {
-        router.push("/verify-email");
-      }
+      router.push(next || "/");
       router.refresh();
     } catch (err) {
       const msg = err.code === "auth/invalid-credential" || err.code === "auth/wrong-password"
@@ -69,13 +62,9 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const { user: signedInUser } = await signInWithPopup(auth, provider);
+      await signInWithPopup(auth, provider);
       const next = safeRedirectTarget();
-      if (signedInUser.emailVerified) {
-        router.push(next || "/");
-      } else {
-        router.push("/verify-email");
-      }
+      router.push(next || "/");
       router.refresh();
     } catch (err) {
       if (err.code === "auth/popup-closed-by-user") {

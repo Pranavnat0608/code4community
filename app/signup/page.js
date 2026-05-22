@@ -7,19 +7,33 @@ import Image from "next/image";
 import { AppPageLayout, CenteredMain } from "@/components/common/AppPageLayout";
 import FullPageLoading from "@/components/common/FullPageLoading";
 import { useAuth } from "@/utils/AuthContext";
+import { lookupBroadRunName } from "@/lib/broadRunRoster";
+import { normalizeEmail } from "@/lib/email";
 import {
   auth,
   provider,
   createUserWithEmailAndPassword,
   signInWithPopup,
   updateProfile,
-  sendEmailVerification,
 } from "@/firebase";
+
+async function applyRosterDisplayName(firebaseUser) {
+  const rosterName = lookupBroadRunName(normalizeEmail(firebaseUser.email));
+  if (rosterName) {
+    await updateProfile(firebaseUser, { displayName: rosterName });
+  }
+}
+
+function safeRedirectTarget() {
+  if (typeof window === "undefined") return null;
+  const raw = new URLSearchParams(window.location.search).get("redirectTo");
+  if (raw && raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  return null;
+}
 
 export default function SignupPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -34,11 +48,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (!authLoading && user) {
-      if (user.emailVerified) {
-        router.replace("/");
-      } else {
-        router.replace("/verify-email");
-      }
+      router.replace(safeRedirectTarget() || "/");
     }
   }, [user, authLoading, router]);
 
@@ -55,16 +65,13 @@ export default function SignupPage() {
     }
     setLoading(true);
     try {
-      const { user: newUser } = await createUserWithEmailAndPassword(auth, email, password);
-      if (name.trim()) {
-        await updateProfile(newUser, { displayName: name.trim() });
-      }
-      const continueUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/verify-email` : "";
-      await sendEmailVerification(newUser, {
-        handleCodeInApp: true,
-        ...(continueUrl && { url: continueUrl }),
-      });
-      router.replace("/verify-email");
+      const { user: newUser } = await createUserWithEmailAndPassword(
+        auth,
+        normalizeEmail(email),
+        password,
+      );
+      await applyRosterDisplayName(newUser);
+      router.replace(safeRedirectTarget() || "/");
       router.refresh();
     } catch (err) {
       const msg =
@@ -85,8 +92,9 @@ export default function SignupPage() {
     setError("");
     setLoading(true);
     try {
-      await signInWithPopup(auth, provider);
-      router.push("/");
+      const { user: signedInUser } = await signInWithPopup(auth, provider);
+      await applyRosterDisplayName(signedInUser);
+      router.push(safeRedirectTarget() || "/");
       router.refresh();
     } catch (err) {
       if (err.code === "auth/popup-closed-by-user") {
@@ -116,24 +124,10 @@ export default function SignupPage() {
           </div>
           <h1 className="text-xl font-bold text-foreground text-center mb-1">Get started</h1>
           <p className="text-muted-foreground text-center text-sm mb-5">
-            Create an account to get started.
+            Sign up with your school email to get started.
           </p>
 
           <form onSubmit={handleEmailSignup} className="space-y-3">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-foreground mb-1.5">
-                Name
-              </label>
-              <input
-                id="name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1.5">
                 Email
@@ -143,7 +137,7 @@ export default function SignupPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
+                placeholder="your@lcps.org"
                 required
                 autoComplete="email"
                 className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"

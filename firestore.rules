@@ -480,6 +480,151 @@
                         request.resource.data.status == 'cancelled';
       }
 
+      // Club Memberships collection - Track student club memberships
+      match /clubMemberships/{membershipId} {
+        // Allow read: Users can read their own memberships, admins can read all
+        allow read: if isAuthenticated() && (
+                        resource.data.studentId == request.auth.uid ||
+                        isAnyAdmin()
+                      );
+        
+        // Allow create: Students can join clubs
+        allow create: if isAuthenticated() &&
+                        request.resource.data.keys().hasAll(['studentId', 'studentName', 'clubName', 'joinedAt', 'updatedAt']) &&
+                        request.resource.data.studentId == request.auth.uid &&
+                        request.resource.data.studentName is string &&
+                        request.resource.data.studentName.size() > 0 &&
+                        request.resource.data.studentName.size() <= 100 &&
+                        request.resource.data.clubName is string &&
+                        request.resource.data.clubName.size() > 0 &&
+                        request.resource.data.joinedAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp;
+        
+        // Allow update: Students can cancel their own memberships
+        allow update: if isAuthenticated() &&
+                        resource.data.studentId == request.auth.uid &&
+                        request.resource.data.studentId == resource.data.studentId &&
+                        request.resource.data.clubName == resource.data.clubName &&
+                        request.resource.data.joinedAt == resource.data.joinedAt &&
+                        request.resource.data.cancelledAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp;
+        
+        // Allow delete: Only admins can delete memberships
+        allow delete: if isAnyAdmin();
+      }
+      
+      // Club Admins collection - Assign admin roles to specific clubs
+      match /clubAdmins/{adminId} {
+        // Allow read: Any authenticated user can read club admins
+        allow read: if isAuthenticated();
+        
+        // Allow create: Only global admins can assign club admins
+        allow create: if isAnyAdmin() &&
+                        request.resource.data.keys().hasAll(['clubName', 'adminId', 'adminName', 'assignedAt', 'assignedBy', 'updatedAt']) &&
+                        request.resource.data.clubName is string &&
+                        request.resource.data.clubName.size() > 0 &&
+                        request.resource.data.adminId is string &&
+                        request.resource.data.adminId.size() > 0 &&
+                        request.resource.data.adminName is string &&
+                        request.resource.data.adminName.size() > 0 &&
+                        request.resource.data.assignedAt is timestamp &&
+                        request.resource.data.assignedBy == request.auth.uid &&
+                        request.resource.data.updatedAt is timestamp;
+        
+        // Allow update: Only global admins can update club admin assignments
+        allow update: if isAnyAdmin() &&
+                        request.resource.data.clubName == resource.data.clubName &&
+                        request.resource.data.adminId == resource.data.adminId &&
+                        request.resource.data.updatedAt is timestamp;
+        
+        // Allow delete: Only global admins can remove club admins
+        allow delete: if isAnyAdmin();
+      }
+      
+      // Club Announcements collection - Club-specific announcements
+      match /clubAnnouncements/{announcementId} {
+        // Allow read: Members of the club can read announcements, admins can read all
+        allow read: if isAuthenticated() && (
+                        resource.data.clubName is string &&
+                        exists(/databases/$(database)/documents/clubMemberships/$(request.auth.uid + '_' + normalizeEmail(resource.data.clubName))) ||
+                        isAnyAdmin()
+                      );
+        
+        // Allow create: Club admins can create announcements for their club
+        allow create: if isAuthenticated() &&
+                        request.resource.data.keys().hasAll(['clubName', 'content', 'senderName', 'senderId', 'createdAt', 'updatedAt']) &&
+                        request.resource.data.clubName is string &&
+                        request.resource.data.clubName.size() > 0 &&
+                        request.resource.data.content is string &&
+                        request.resource.data.content.size() > 0 &&
+                        request.resource.data.content.size() <= 2000 &&
+                        request.resource.data.senderName is string &&
+                        request.resource.data.senderName.size() > 0 &&
+                        request.resource.data.senderId == request.auth.uid &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp &&
+                        // Verify sender is admin of this club
+                        exists(/databases/$(database)/documents/clubAdmins/$(request.auth.uid + '_' + normalizeEmail(request.resource.data.clubName)));
+        
+        // Allow update: Only admins can update announcements (for corrections)
+        allow update: if isAnyAdmin() &&
+                        request.resource.data.clubName == resource.data.clubName &&
+                        request.resource.data.senderId == resource.data.senderId &&
+                        request.resource.data.createdAt == resource.data.createdAt &&
+                        request.resource.data.updatedAt is timestamp;
+        
+        // Allow delete: Only admins can delete announcements
+        allow delete: if isAnyAdmin();
+      }
+      
+      // Club Attendance collection - Club-specific attendance records
+      match /clubAttendance/{attendanceId} {
+        // Allow read: Club admins can read attendance for their club, students can read their own attendance
+        allow read: if isAuthenticated() && (
+                        // Club admins can read attendance for their club
+                        (resource.data.clubName is string &&
+                         exists(/databases/$(database)/documents/clubAdmins/$(request.auth.uid + '_' + normalizeEmail(resource.data.clubName)))) ||
+                        // Students can read their own attendance records
+                        resource.data.studentId == request.auth.uid ||
+                        // Global admins can read all
+                        isAnyAdmin()
+                      );
+        
+        // Allow create: Club admins can create attendance records for their club
+        allow create: if isAuthenticated() &&
+                        request.resource.data.keys().hasAll(['clubName', 'meetingDate', 'studentId', 'studentName', 'status', 'recordedBy', 'recordedAt', 'updatedAt']) &&
+                        request.resource.data.clubName is string &&
+                        request.resource.data.clubName.size() > 0 &&
+                        request.resource.data.meetingDate is string &&
+                        request.resource.data.meetingDate.size() > 0 &&
+                        request.resource.data.studentId is string &&
+                        request.resource.data.studentId.size() > 0 &&
+                        request.resource.data.studentName is string &&
+                        request.resource.data.studentName.size() > 0 &&
+                        request.resource.data.studentName.size() <= 100 &&
+                        request.resource.data.status in ['present', 'absent'] &&
+                        request.resource.data.recordedBy == request.auth.uid &&
+                        request.resource.data.recordedAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp &&
+                        // Verify recorder is admin of this club
+                        exists(/databases/$(database)/documents/clubAdmins/$(request.auth.uid + '_' + normalizeEmail(request.resource.data.clubName)));
+        
+        // Allow update: Club admins can update attendance records for their club
+        allow update: if isAuthenticated() &&
+                        resource.data.clubName is string &&
+                        resource.data.meetingDate == resource.data.meetingDate &&
+                        resource.data.studentId == resource.data.studentId &&
+                        resource.data.studentName == resource.data.studentName &&
+                        resource.data.recordedAt == resource.data.recordedAt &&
+                        request.resource.data.status in ['present', 'absent'] &&
+                        request.resource.data.updatedAt is timestamp &&
+                        // Verify updater is admin of this club
+                        exists(/databases/$(database)/documents/clubAdmins/$(request.auth.uid + '_' + normalizeEmail(resource.data.clubName)));
+        
+        // Allow delete: Only admins can delete attendance records
+        allow delete: if isAnyAdmin();
+      }
+
       // Deny all other collections and documents
       match /{document=**} {
         allow read, write: if false;

@@ -53,6 +53,12 @@ export default function ClubHubPage() {
           <Link href="/club-hub/directory" className="hover:underline underline-offset-4">
             Club Directory
           </Link>
+          <Link href="/club-hub/my-clubs" className="hover:underline underline-offset-4">
+            My Clubs
+          </Link>
+          <Link href="/club-hub/admin" className="hover:underline underline-offset-4">
+            Admin
+          </Link>
           <Link href="/login?redirectTo=%2Fclub-hub" className="hover:underline underline-offset-4">
             Log in
           </Link>

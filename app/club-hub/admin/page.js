@@ -2,13 +2,13 @@
 
 import { useLayoutEffect } from "react";
 import Link from "next/link";
-import BroadRunClubDirectory from "@/components/club-hub/BroadRunClubDirectory";
+import ClubAdminDashboard from "@/components/club-hub/ClubAdminDashboard";
 
 const MAROON = "#5c1417";
 
-export default function ClubHubDirectoryPage() {
+export default function ClubAdminPage() {
   useLayoutEffect(() => {
-    document.title = "Broad Run Club Directory";
+    document.title = "Club Admin - Broad Run Club Hub";
   }, []);
 
   return (
@@ -18,21 +18,24 @@ export default function ClubHubDirectoryPage() {
           <Link href="/club-hub" className="hover:underline underline-offset-4">
             Home
           </Link>
-          <span className="cursor-default opacity-95 underline decoration-white underline-offset-4">Club Directory</span>
+          <Link href="/club-hub/directory" className="hover:underline underline-offset-4">
+            Club Directory
+          </Link>
           <Link href="/club-hub/my-clubs" className="hover:underline underline-offset-4">
             My Clubs
           </Link>
-          <Link href="/club-hub/admin" className="hover:underline underline-offset-4">
-            Admin
-          </Link>
-          <Link href="/login?redirectTo=%2Fclub-hub%2Fdirectory" className="hover:underline underline-offset-4">
-            Log in
-          </Link>
+          <span className="cursor-default opacity-95 underline decoration-white underline-offset-4">Admin</span>
         </div>
       </nav>
 
       <main className="mx-auto w-full max-w-[90vw] px-4 pb-12 pt-10 sm:px-6 sm:pt-12">
-        <BroadRunClubDirectory />
+        <div className="border-y border-neutral-900 py-4 sm:py-5 mb-6">
+          <h2 className="text-center text-base font-bold uppercase tracking-[0.06em] text-[#5c1417] sm:text-lg">
+            Club Administration
+          </h2>
+        </div>
+
+        <ClubAdminDashboard />
       </main>
 
       <footer className="border-t border-neutral-200 bg-white py-6 text-center text-xs text-neutral-500">

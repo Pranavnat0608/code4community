@@ -1,0 +1,96 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function sessionPath(sessionId) {
+      return /databases/(default)/documents/sessions/$(sessionId);
+    }
+
+    function userPath() {
+      return /databases/(default)/documents/users/$(request.auth.uid);
+    }
+
+    function sessionDoc(sessionId) {
+      return firestore.get(sessionPath(sessionId)).data;
+    }
+
+    function userDoc() {
+      return firestore.get(userPath()).data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function sessionExists(sessionId) {
+      return firestore.exists(sessionPath(sessionId));
+    }
+
+    function isSessionStudent(sessionId) {
+      return isSignedIn() &&
+        sessionExists(sessionId) &&
+        sessionDoc(sessionId).studentId == request.auth.uid;
+    }
+
+    function isSessionTutor(sessionId) {
+      return isSignedIn() &&
+        sessionExists(sessionId) &&
+        sessionDoc(sessionId).tutorId == request.auth.uid;
+    }
+
+    function isWritingCenterStaff() {
+      return isSignedIn() &&
+        firestore.exists(userPath()) &&
+        (
+          userDoc().role in ['tutor', 'TUTOR', 'teacher', 'TEACHER', 'admin', 'ADMIN'] ||
+          (('writingCenterRole' in userDoc()) && userDoc().writingCenterRole == 'tutor')
+        );
+    }
+
+    function isAdminByEmail() {
+      return isSignedIn() &&
+        request.auth.token.email is string &&
+        request.auth.token.email.lower() in ['1021676@lcps.org', 'shail40926@gmail.com'];
+    }
+
+    function canReadSessionReport(sessionId) {
+      return isSessionStudent(sessionId) ||
+        isSessionTutor(sessionId) ||
+        isWritingCenterStaff() ||
+        isAdminByEmail();
+    }
+
+    function isPdfUpload() {
+      return request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType is string &&
+        (
+          request.resource.contentType == 'application/pdf' ||
+          request.resource.contentType.matches('application/pdf.*') ||
+          // Some browsers/OS send a generic type; path is always session-report.pdf
+          request.resource.contentType == 'application/octet-stream'
+        );
+    }
+
+    function isSessionOverseeingTeacher(sessionId) {
+      return isSignedIn() &&
+        sessionExists(sessionId) &&
+        sessionDoc(sessionId).sessionType == 'MINI_LESSON' &&
+        sessionDoc(sessionId).teacherId == request.auth.uid;
+    }
+
+    function canWriteSessionReport(sessionId) {
+      return (sessionExists(sessionId) &&
+        sessionDoc(sessionId).sessionType != 'MINI_LESSON' &&
+        isSessionTutor(sessionId)) ||
+        isSessionOverseeingTeacher(sessionId);
+    }
+
+    match /writing-center/sessions/{sessionId}/{fileName} {
+      allow read: if canReadSessionReport(sessionId);
+
+      allow write: if fileName == 'session-report.pdf' &&
+        isPdfUpload() &&
+        canWriteSessionReport(sessionId);
+    }
+  }
+}

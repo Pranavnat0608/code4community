@@ -10,15 +10,16 @@ import {
 } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { assertClientRateLimit } from "@/utils/clientRateLimit";
 import { auth, firestore } from "@/firebase";
-import { UserCache, CachePerformance } from "@/utils/cache";
-import { isAdminEmail } from "@/config/admin";
-import { lookupBroadRunName } from "@/lib/broadRunRoster";
+import { UserCache } from "@/utils/cache";
+import { isAdminEmail } from "@/lib/admin";
+import { lookupBroadRunName } from "@/lib/club-hub/broadRunRoster";
 import {
   applyPendingGrantToProfile,
   MATHLAB_TEAM_PENDING_COLLECTION,
   pendingTeamDocId,
-} from "@/lib/mathlabTeamPending";
+} from "@/lib/mathlab/teamPending";
 import { normalizeEmail } from "@/lib/email";
 
 const AuthContext = createContext({ user: null, userData: null, loading: true });
@@ -27,20 +28,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(() => Boolean(auth));
-  const [lastFetchTime, setLastFetchTime] = useState(0);
-
   const fetchUserData = useCallback(async (currentUser, forceRefresh = false) => {
     if (!currentUser || !firestore) {
       return null;
     }
 
-    const timing = CachePerformance.startTiming("fetchUserData");
-
     try {
       if (!forceRefresh) {
         const cachedData = UserCache.getUserData();
         if (cachedData && cachedData.uid === currentUser.uid) {
-          CachePerformance.endTiming(timing);
           return cachedData;
         }
       }
@@ -53,16 +49,14 @@ export function AuthProvider({ children }) {
         const normalizedEmail = normalizeEmail(data.email || currentUser.email);
         if (data.email && data.email !== normalizedEmail) {
           try {
+            assertClientRateLimit("profileWrite", currentUser.uid);
             await updateDoc(docRef, { email: normalizedEmail, updatedAt: serverTimestamp() });
             data.email = normalizedEmail;
           } catch (migrateErr) {
-            console.warn("[AuthContext] could not normalize stored email", migrateErr);
           }
         }
         const userDataWithUid = { ...data, email: normalizedEmail, uid: currentUser.uid };
         UserCache.setUserData(userDataWithUid);
-        setLastFetchTime(Date.now());
-        CachePerformance.endTiming(timing);
         return userDataWithUid;
       }
 
@@ -75,6 +69,7 @@ export function AuthProvider({ children }) {
         "User";
       let role = isAdminEmail(normalizedEmail) ? "admin" : "student";
       let mathLabRole = "";
+      let writingCenterRole = "";
       const pendingRef = doc(
         firestore,
         MATHLAB_TEAM_PENDING_COLLECTION,
@@ -84,11 +79,12 @@ export function AuthProvider({ children }) {
       if (pendingSnap.exists()) {
         const withPending = applyPendingGrantToProfile(
           pendingSnap.data(),
-          { role, mathLabRole },
+          { role, mathLabRole, writingCenterRole },
           normalizedEmail,
         );
         role = withPending.role;
         mathLabRole = withPending.mathLabRole;
+        writingCenterRole = withPending.writingCenterRole || "";
       }
       const newProfile = {
         email: normalizedEmail,
@@ -96,60 +92,30 @@ export function AuthProvider({ children }) {
         photoURL: currentUser.photoURL || "",
         role,
         mathLabRole,
+        writingCenterRole,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
+      assertClientRateLimit("profileWrite", currentUser.uid);
       await setDoc(docRef, newProfile);
       if (pendingSnap.exists()) {
         try {
           await deleteDoc(pendingRef);
         } catch (pendingErr) {
-          console.warn("[AuthContext] could not clear pending team grant", pendingErr);
         }
       }
       const again = await getDoc(docRef);
       if (again.exists()) {
         const userDataWithUid = { ...again.data(), uid: currentUser.uid };
         UserCache.setUserData(userDataWithUid);
-        setLastFetchTime(Date.now());
-        CachePerformance.endTiming(timing);
         return userDataWithUid;
       }
 
-      CachePerformance.endTiming(timing);
       return null;
-    } catch (err) {
-      console.error("[AuthContext] fetchUserData", {
-        error: err,
-        code: err?.code,
-        message: err?.message,
-        uid: currentUser?.uid,
-        forceRefresh,
-      });
-      CachePerformance.endTiming(timing);
+    } catch {
       return null;
     }
   }, []);
-
-  const refreshUserData = useCallback(async () => {
-    if (!user) {
-      return;
-    }
-
-    const timing = CachePerformance.startTiming("refreshUserData");
-    const timeSinceLastFetch = Date.now() - lastFetchTime;
-    const shouldRefresh = timeSinceLastFetch > 5 * 60 * 1000;
-
-    if (shouldRefresh) {
-      const data = await fetchUserData(user, true);
-      if (data) {
-        setUserData(data);
-        setLastFetchTime(Date.now());
-      }
-    }
-
-    CachePerformance.endTiming(timing);
-  }, [user, fetchUserData, lastFetchTime]);
 
   useEffect(() => {
     if (!auth || !firestore) {
@@ -165,7 +131,6 @@ export function AuthProvider({ children }) {
           const freshData = await fetchUserData(currentUser, true);
           if (freshData) {
             setUserData(freshData);
-            setLastFetchTime(Date.now());
           } else {
             const cachedData = UserCache.getUserData();
             if (cachedData && cachedData.uid === currentUser.uid) {
@@ -177,12 +142,6 @@ export function AuthProvider({ children }) {
           UserCache.clearUserData();
         }
       } catch (error) {
-        console.error("[AuthContext] Auth state change error:", {
-          error: error.message,
-          code: error.code,
-          hasUser: !!currentUser,
-          uid: currentUser?.uid,
-        });
         const cachedData = UserCache.getUserData();
         if (cachedData) {
           setUserData(cachedData);
@@ -201,7 +160,6 @@ export function AuthProvider({ children }) {
         const freshData = await fetchUserData(user, true);
         if (freshData) {
           setUserData(freshData);
-          setLastFetchTime(Date.now());
         }
       }
     };
@@ -232,11 +190,9 @@ export function AuthProvider({ children }) {
       userData,
       loading,
       getRedirectUrl,
-      refreshUserData,
-      lastFetchTime,
       isEmailVerified: true,
     }),
-    [user, userData, loading, refreshUserData, lastFetchTime],
+    [user, userData, loading],
   );
 
   return <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>;

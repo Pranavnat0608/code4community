@@ -1,55 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useAuth } from "@/utils/AuthContext";
+import { resolveWritingCenterViewRole } from "@/lib/profile";
 import { AppPageLayout } from "@/components/common/AppPageLayout";
-import StudentDashboard from "./StudentDashboard";
-import TutorDashboard from "./TutorDashboard";
-import AdminDashboard from "./AdminDashboard";
+import StudentDashboard from "@/components/writing-center/StudentDashboard";
+import TutorDashboard from "@/components/writing-center/TutorDashboard";
+import AdminDashboard from "@/components/writing-center/AdminDashboard";
+import TeacherDashboard from "@/components/writing-center/TeacherDashboard";
 import { firestore } from "@/firebase";
-import { doc, getDoc } from "firebase/firestore";
 
 export default function WritingCenterPage() {
-  const { user, loading } = useAuth();
-  const [userRole, setUserRole] = useState('STUDENT');
-  const [roleLoading, setRoleLoading] = useState(true);
-  const [firebaseError, setFirebaseError] = useState(false);
+  const { user, userData, loading } = useAuth();
+  const userRole = resolveWritingCenterViewRole(userData);
+  const firebaseError = !firestore;
 
-  useEffect(() => {
-    if (!firestore) {
-      setFirebaseError(true);
-      setRoleLoading(false);
-      return;
-    }
-
-    if (user) {
-      fetchUserRole();
-    } else {
-      setRoleLoading(false);
-    }
-  }, [user]);
-
-  const fetchUserRole = async () => {
-    try {
-      const userDoc = await getDoc(doc(firestore, 'users', user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const role = (userData.role || 'STUDENT').toUpperCase();
-        console.log('WritingCenterPage - User role from Firestore:', userData.role, '->', role);
-        setUserRole(role);
-      } else {
-        console.log('WritingCenterPage - No user document found, defaulting to STUDENT');
-        setUserRole('STUDENT');
-      }
-    } catch (error) {
-      console.error('Failed to fetch user role:', error);
-      setUserRole('STUDENT');
-    } finally {
-      setRoleLoading(false);
-    }
-  };
-
-  if (loading || roleLoading) {
+  if (loading) {
     return (
       <AppPageLayout>
         <div className="flex items-center justify-center min-h-screen">
@@ -101,11 +66,19 @@ export default function WritingCenterPage() {
     );
   }
 
+  const isAdminView = userRole === "ADMIN";
+
   return (
     <AppPageLayout>
-      {userRole === 'STUDENT' && <StudentDashboard />}
-      {userRole === 'TUTOR' && <TutorDashboard />}
-      {userRole === 'ADMIN' && <AdminDashboard />}
+      {userRole === "STUDENT" && <StudentDashboard />}
+      {userRole === "TUTOR" && <TutorDashboard />}
+      {userRole === "TEACHER" && <TeacherDashboard />}
+      {isAdminView && <AdminDashboard />}
+      {!["STUDENT", "TUTOR", "ADMIN", "TEACHER"].includes(userRole) && (
+        <div className="px-6 py-8 text-center text-gray-600">
+          <p>Unknown role: {userRole}. Ask an admin to set your Writing Center role in Firestore.</p>
+        </div>
+      )}
     </AppPageLayout>
   );
 }

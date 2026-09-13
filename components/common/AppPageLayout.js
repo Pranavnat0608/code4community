@@ -1,7 +1,5 @@
-"use client";
-
-import DashboardTopBar from "@/components/DashboardTopBar";
-import Footer from "@/components/Footer";
+import DashboardTopBar from "@/components/layout/DashboardTopBar";
+import Footer from "@/components/layout/Footer";
 
 export function AppPageLayout({
   children,
@@ -17,7 +15,7 @@ export function AppPageLayout({
   return (
     <div className={classes}>
       <DashboardTopBar title={title} showNavLinks={showNavLinks} />
-      {children}
+      <div className="flex-1 flex flex-col w-full">{children}</div>
       {showFooter ? <Footer /> : null}
     </div>
   );

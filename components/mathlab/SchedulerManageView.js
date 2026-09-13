@@ -2,14 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/utils/AuthContext";
-import { spotsLeft } from "@/lib/mathlabScheduler";
-import {
-  closeSlot,
-  createSlot,
-  deleteSlot,
-  fetchBookingsForSlot,
-  subscribeHostSlots,
-} from "@/lib/mathlabSchedulerFirestore";
+import { spotsLeft } from "@/lib/mathlab/scheduler";
+import { OFFICE_HOURS_SCHEDULER } from "@/lib/mathlab/schedulerConfig";
+import { officeHoursScheduler } from "@/lib/mathlab/schedulerFirestore";
 import {
   addMinutes,
   availableYmdsFromSlots,
@@ -22,15 +17,26 @@ import {
   slotsForDay,
   TEACHER_TIME_PRESETS,
   toYmd,
-} from "@/lib/schedulerCalendar";
+} from "@/lib/mathlab/schedulerCalendar";
 import AvailabilityPicker, { TimeSlotButton } from "@/components/mathlab/AvailabilityPicker";
+import { resolveDisplayName } from "@/lib/profile";
 
 const defaultSettings = {
   maxCapacity: "4",
   signupCloseMinutes: "60",
 };
 
-export default function SchedulerManageView() {
+export default function SchedulerManageView({
+  scheduler = officeHoursScheduler,
+  config = OFFICE_HOURS_SCHEDULER,
+}) {
+  const {
+    closeSlot,
+    createSlot,
+    deleteSlot,
+    fetchBookingsForSlot,
+    subscribeHostSlots,
+  } = scheduler;
   const { user, userData } = useAuth();
   const [slots, setSlots] = useState([]);
   const [settings, setSettings] = useState(defaultSettings);
@@ -50,11 +56,10 @@ export default function SchedulerManageView() {
   }));
   const [massProgress, setMassProgress] = useState(null);
 
-  const hostName =
-    userData?.displayName ||
-    [userData?.firstName, userData?.lastName].filter(Boolean).join(" ") ||
-    user?.displayName ||
-    "Teacher";
+  const hostName = resolveDisplayName(
+    { ...userData, displayName: userData?.displayName || user?.displayName },
+    "Teacher",
+  );
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -105,6 +110,7 @@ export default function SchedulerManageView() {
       await createSlot({
         hostId: user.uid,
         hostName,
+        slotType: config.defaultSlotType,
         startAt: start,
         endAt: end,
         maxCapacity: Number(settings.maxCapacity),
@@ -224,6 +230,7 @@ export default function SchedulerManageView() {
           await createSlot({
             hostId: user.uid,
             hostName,
+            slotType: config.defaultSlotType,
             startAt: start,
             endAt: end,
             maxCapacity: Number(settings.maxCapacity),

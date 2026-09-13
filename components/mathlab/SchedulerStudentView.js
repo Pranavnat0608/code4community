@@ -3,33 +3,41 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/utils/AuthContext";
-import { MATHLAB_COURSES } from "@/lib/mathlabCourses";
+import { MATHLAB_COURSES } from "@/lib/mathlab/courses";
+import { resolveDisplayName } from "@/lib/profile";
 import {
   formatSlotWhen,
   isSlotBookable,
   slotTypeLabel,
   SLOT_TYPES,
   spotsLeft,
-} from "@/lib/mathlabScheduler";
-import {
-  bookSlot,
-  cancelBooking,
-  subscribeOpenSlots,
-  subscribeStudentBookings,
-} from "@/lib/mathlabSchedulerFirestore";
+} from "@/lib/mathlab/scheduler";
+import { OFFICE_HOURS_SCHEDULER } from "@/lib/mathlab/schedulerConfig";
+import { officeHoursScheduler } from "@/lib/mathlab/schedulerFirestore";
 import {
   availableYmdsFromSlots,
   formatTime12h,
   slotStartDate,
   slotsForDay,
   toYmd,
-} from "@/lib/schedulerCalendar";
+} from "@/lib/mathlab/schedulerCalendar";
 import AvailabilityPicker, {
   FilterMenuButton,
   TimeSlotButton,
 } from "@/components/mathlab/AvailabilityPicker";
+import { SchedulerCache } from "@/utils/cache";
+import { hydrateLiveList } from "@/utils/liveFirestoreCache";
 
-export default function SchedulerStudentView() {
+export default function SchedulerStudentView({
+  scheduler = officeHoursScheduler,
+  config = OFFICE_HOURS_SCHEDULER,
+}) {
+  const {
+    bookSlot,
+    cancelBooking,
+    subscribeOpenSlots,
+    subscribeStudentBookings,
+  } = scheduler;
   const { user, userData } = useAuth();
   const [slots, setSlots] = useState([]);
   const [myBookings, setMyBookings] = useState([]);
@@ -46,17 +54,31 @@ export default function SchedulerStudentView() {
   const [selectedYmd, setSelectedYmd] = useState("");
   const [viewMonth, setViewMonth] = useState(() => new Date());
 
-  useEffect(() => subscribeOpenSlots(setSlots), []);
+  useEffect(() => {
+    hydrateLiveList(
+      () => SchedulerCache.getOpenSlots(scheduler.slotsCollection),
+      setSlots
+    );
+    return subscribeOpenSlots(setSlots);
+  }, [scheduler.slotsCollection, subscribeOpenSlots]);
+
   useEffect(() => {
     if (!user?.uid) return;
+    hydrateLiveList(
+      () =>
+        SchedulerCache.getStudentBookings(
+          scheduler.bookingsCollection,
+          user.uid
+        ),
+      setMyBookings
+    );
     return subscribeStudentBookings(user.uid, setMyBookings);
-  }, [user?.uid]);
+  }, [user?.uid, scheduler.bookingsCollection, subscribeStudentBookings]);
 
-  const displayName =
-    userData?.displayName ||
-    [userData?.firstName, userData?.lastName].filter(Boolean).join(" ") ||
-    user?.displayName ||
-    "Student";
+  const displayName = resolveDisplayName(
+    { ...userData, displayName: userData?.displayName || user?.displayName },
+    "Student",
+  );
 
   const teachers = useMemo(() => {
     const map = new Map();
@@ -135,7 +157,7 @@ export default function SchedulerStudentView() {
       });
       setPendingSlot(null);
       setNote("");
-      setMessage("Booked! See you at Math Lab.");
+      setMessage(config.bookSuccessMessage);
     } catch (e) {
       setMessage(e.message || "Could not book.");
     } finally {
@@ -250,10 +272,10 @@ export default function SchedulerStudentView() {
         {canManage && (
           <div className="absolute right-0 -top-6 sm:-top-8">
             <Link
-              href="/mathlab/scheduler/manage"
+              href={config.managePath}
               className="text-sm font-medium text-[#0078d4] hover:underline"
             >
-              Set your availability →
+              {config.manageLinkLabel}
             </Link>
           </div>
         )}
@@ -279,34 +301,44 @@ export default function SchedulerStudentView() {
             : "Pick a highlighted day on the calendar."
         }
         headerExtra={
-          <FilterMenuButton open={filterOpen} onToggle={() => setFilterOpen((o) => !o)}>
-            <label className="block text-xs font-medium text-[#616161]">Type</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value)}
-              className="w-full text-sm rounded border border-[#e1e1e1] px-2 py-1.5"
-            >
-              <option value="all">All types</option>
-              {SLOT_TYPES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <label className="block text-xs font-medium text-[#616161]">Course</label>
-            <select
-              value={filterCourse}
-              onChange={(e) => setFilterCourse(e.target.value)}
-              className="w-full text-sm rounded border border-[#e1e1e1] px-2 py-1.5"
-            >
-              <option value="all">All courses</option>
-              {MATHLAB_COURSES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </FilterMenuButton>
+          (config.showTypeFilter || config.showCourseFilter) ? (
+            <FilterMenuButton open={filterOpen} onToggle={() => setFilterOpen((o) => !o)}>
+              {config.showTypeFilter && (
+                <>
+                  <label className="block text-xs font-medium text-[#616161]">Type</label>
+                  <select
+                    value={filterType}
+                    onChange={(e) => setFilterType(e.target.value)}
+                    className="w-full text-sm rounded border border-[#e1e1e1] px-2 py-1.5"
+                  >
+                    <option value="all">All types</option>
+                    {SLOT_TYPES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              {config.showCourseFilter && (
+                <>
+                  <label className="block text-xs font-medium text-[#616161]">Course</label>
+                  <select
+                    value={filterCourse}
+                    onChange={(e) => setFilterCourse(e.target.value)}
+                    className="w-full text-sm rounded border border-[#e1e1e1] px-2 py-1.5"
+                  >
+                    <option value="all">All courses</option>
+                    {MATHLAB_COURSES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </FilterMenuButton>
+          ) : null
         }
       >
         <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
@@ -387,7 +419,7 @@ export default function SchedulerStudentView() {
         {!user && daySlots.length > 0 && (
           <p className="mt-4 text-sm text-center text-[#616161]">
             <Link
-              href={`/login?redirectTo=${encodeURIComponent("/mathlab/scheduler")}`}
+              href={`/login?redirectTo=${encodeURIComponent(config.bookPath)}`}
               className="text-[#0078d4] font-medium hover:underline"
             >
               Sign in

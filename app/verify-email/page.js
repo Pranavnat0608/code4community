@@ -44,7 +44,6 @@ export default function VerifyEmailPage() {
       });
       setResendSent(true);
     } catch (err) {
-      console.error(err);
     } finally {
       setResending(false);
     }
@@ -80,7 +79,7 @@ export default function VerifyEmailPage() {
       <CenteredMain className="py-8 min-h-0">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-6">
-            <Image src="/c4c.png" alt="Code4Community" width={56} height={56} />
+            <Image src="/brand/c4c.png" alt="Code4Community" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-bold text-foreground text-center mb-2">
             Waiting for email verification

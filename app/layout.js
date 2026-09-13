@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import ChunkLoadRecovery from "@/components/ChunkLoadRecovery";
+import ErrorBoundary from "@/components/layout/ErrorBoundary";
 import { AuthProvider } from "@/utils/AuthContext";
 
 // Security headers are configured in next.config.mjs
@@ -24,17 +23,17 @@ const inter = Inter({
 export const metadata = {
   title: "Code4Community",
   description: "At Code4Community, we build donor management systems, volunteer platforms, program dashboards, and custom software for nonprofits and organizations.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community.net'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community26.web.app'),
   alternates: {
     canonical: '/',
   },
   icons: {
     icon: [
-      { url: '/c4c.png', sizes: '32x32', type: 'image/png' },
-      { url: '/c4c.png', sizes: '16x16', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '32x32', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: [
-      { url: '/c4c.png', sizes: '180x180', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 };
@@ -46,16 +45,12 @@ export const viewport = {
   userScalable: false,
 };
 
-// Avoid Firebase CDN caching prerendered HTML for a year while JS chunks rotate each deploy.
-export const dynamic = 'force-dynamic';
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ChunkLoadRecovery />
         <ErrorBoundary>
           <AuthProvider>
             {children}

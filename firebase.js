@@ -1,4 +1,9 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
+/**
+ * Client Firebase SDK entry — kept at repo root so Turbopack/webpack
+ * `./keys.dev.js` → `tempkeys.dev.js` aliases in next.config.mjs keep working.
+ * Shared config helpers live in `@/lib/firebase/*`.
+ */
 import {
   getAuth,
   GoogleAuthProvider,
@@ -22,21 +27,20 @@ import { getStorage } from "firebase/storage";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 import { firebaseConfig as devFirebaseConfig, recaptchaSiteKey as devRecaptchaSiteKey } from "./keys.dev.js";
-import {
-  getPublicFirebaseConfig,
-  getRecaptchaSiteKey,
-  maskSecret,
-} from "@/lib/firebaseConfig";
+import { getPublicFirebaseConfig, getRecaptchaSiteKey } from "@/lib/firebase/config";
 
 const isDev = process.env.NODE_ENV === "development";
+/** `npm run preview:local` — production build against c4cdev (keys.dev.js), not code4community26. */
+const useDevFirebase =
+  isDev || process.env.NEXT_PUBLIC_USE_DEV_FIREBASE === "1";
 
 const isBuildTime =
   typeof window === "undefined" &&
-  !isDev &&
+  !useDevFirebase &&
   !process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
 
 function resolveConfig() {
-  if (isDev) {
+  if (useDevFirebase) {
     return { config: devFirebaseConfig, recaptcha: devRecaptchaSiteKey, source: "keys.dev.js" };
   }
 
@@ -74,17 +78,7 @@ function resolveConfig() {
   };
 }
 
-const { config: firebaseConfig, recaptcha: recaptchaSiteKey, source: configSource } =
-  resolveConfig();
-
-if (typeof window !== "undefined") {
-  console.info("[Firebase] config source:", configSource, {
-    projectId: firebaseConfig?.projectId,
-    authDomain: firebaseConfig?.authDomain,
-    apiKey: maskSecret(firebaseConfig?.apiKey),
-    appCheck: recaptchaSiteKey ? "enabled" : "off",
-  });
-}
+const { config: firebaseConfig, recaptcha: recaptchaSiteKey } = resolveConfig();
 
 let app;
 let auth;
@@ -98,14 +92,7 @@ try {
   firestore = getFirestore(app);
   storage = getStorage(app);
   provider = new GoogleAuthProvider();
-  if (typeof window !== "undefined") {
-    console.info("[Firebase] initialized OK");
-  }
-} catch (error) {
-  console.error("[Firebase] init failed:", error?.code || error?.message || error);
-  console.error(
-    "[Firebase] debug: open /api/debug/firebase-config — check API key restrictions & authorized domains",
-  );
+} catch {
   app = null;
   auth = null;
   firestore = null;
@@ -116,7 +103,7 @@ try {
 if (
   !isBuildTime &&
   typeof window !== "undefined" &&
-  !isDev &&
+  !useDevFirebase &&
   recaptchaSiteKey &&
   app
 ) {
@@ -125,9 +112,8 @@ if (
       provider: new ReCaptchaV3Provider(recaptchaSiteKey),
       isTokenAutoRefreshEnabled: true,
     });
-    console.info("[Firebase] App Check initialized");
-  } catch (error) {
-    console.error("[Firebase] App Check failed:", error);
+  } catch {
+    // App Check optional when misconfigured locally
   }
 }
 
@@ -136,10 +122,6 @@ if (provider) {
     prompt: "select_account",
     access_type: "offline",
   });
-}
-
-if (!firestore && typeof window !== "undefined") {
-  console.error("[Firebase] Firestore is not initialized");
 }
 
 export {

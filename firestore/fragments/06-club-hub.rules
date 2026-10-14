@@ -140,8 +140,42 @@
                                     request.resource.data.memberCount.size() <= 40)) &&
                                 (!('headerImageUrl' in request.resource.data) ||
                                   (request.resource.data.headerImageUrl is string &&
-                                    request.resource.data.headerImageUrl.size() <= 2000));
+                                    request.resource.data.headerImageUrl.size() <= 2000)) &&
+                                (!('memberSignupLimit' in request.resource.data) ||
+                                  request.resource.data.memberSignupLimit == null ||
+                                  (request.resource.data.memberSignupLimit is int &&
+                                    request.resource.data.memberSignupLimit >= 1 &&
+                                    request.resource.data.memberSignupLimit <= 5000));
         allow delete: if isClubHubAdmin();
+      }
+
+      function clubHubMemberSignupLimitForSlug(clubSlug) {
+        let pagePath = /databases/$(database)/documents/clubHubPages/$(clubSlug);
+        return exists(pagePath) &&
+               ('memberSignupLimit' in get(pagePath).data) &&
+               get(pagePath).data.memberSignupLimit is int &&
+               get(pagePath).data.memberSignupLimit >= 1
+               ? get(pagePath).data.memberSignupLimit
+               : null;
+      }
+
+      function clubHubHasMemberSignupLimit(clubSlug) {
+        return clubHubMemberSignupLimitForSlug(clubSlug) != null;
+      }
+
+      function clubHubMembershipCountForSlug(clubSlug) {
+        let countPath = /databases/$(database)/documents/clubHubMembershipCounts/$(clubSlug);
+        return exists(countPath) ? get(countPath).data.memberCount : 0;
+      }
+
+      function clubHubCanAcceptNewMember(clubSlug) {
+        return !clubHubHasMemberSignupLimit(clubSlug) ||
+               clubHubMembershipCountForSlug(clubSlug) < clubHubMemberSignupLimitForSlug(clubSlug);
+      }
+
+      function clubHubMembershipCountIncrementAllowed(clubSlug, newCount) {
+        return !clubHubHasMemberSignupLimit(clubSlug) ||
+               newCount <= clubHubMemberSignupLimitForSlug(clubSlug);
       }
 
       function isValidClubHubEventWrite() {
@@ -228,7 +262,8 @@
         );
         allow create: if isAuthenticated() &&
                         membershipId == clubHubMembershipDocIdForWrite() &&
-                        isValidClubHubMembershipWrite();
+                        isValidClubHubMembershipWrite() &&
+                        clubHubCanAcceptNewMember(request.resource.data.clubSlug);
         allow update: if false;
         allow delete: if isAuthenticated() &&
                         resource.data.userId == request.auth.uid;
@@ -337,12 +372,16 @@
         allow create: if isAuthenticated() &&
                         request.resource.data.clubSlug == slug &&
                         isValidClubHubMembershipCountFields() &&
-                        request.resource.data.memberCount == 1;
+                        request.resource.data.memberCount == 1 &&
+                        clubHubMembershipCountIncrementAllowed(slug, 1);
         allow update: if isAuthenticated() &&
                         request.resource.data.clubSlug == slug &&
                         isValidClubHubMembershipCountFields() &&
                         (
-                          request.resource.data.memberCount == resource.data.memberCount + 1 ||
+                          (
+                            request.resource.data.memberCount == resource.data.memberCount + 1 &&
+                            clubHubMembershipCountIncrementAllowed(slug, request.resource.data.memberCount)
+                          ) ||
                           request.resource.data.memberCount == resource.data.memberCount - 1
                         );
         allow delete: if isClubHubAdmin();

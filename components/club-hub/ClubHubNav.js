@@ -17,7 +17,7 @@ import { auth, signOut } from "@/firebase";
 
 /**
  * Club Hub top nav — same Firebase session as the rest of the site.
- * @param {{ active?: "home" | "directory" | "meeting-days" | "admin" | "sponsor" | null, loginRedirect?: string }} props
+ * @param {{ active?: "home" | "directory" | "resources" | "meeting-days" | "admin" | "sponsor" | null, loginRedirect?: string }} props
  */
 export default function ClubHubNav({ active = null, loginRedirect = "/club-hub" }) {
   const { user, userData, loading } = useAuth();
@@ -82,13 +82,13 @@ export default function ClubHubNav({ active = null, loginRedirect = "/club-hub" 
   function navItem(label, isActive, href) {
     if (isActive) {
       return (
-        <span className={clubHubNavLinkActiveClass} aria-current="page">
+        <span className={`whitespace-nowrap ${clubHubNavLinkActiveClass}`} aria-current="page">
           {label}
         </span>
       );
     }
     return (
-      <Link href={href} className={clubHubNavLinkClass}>
+      <Link href={href} className={`whitespace-nowrap ${clubHubNavLinkClass}`}>
         {label}
       </Link>
     );
@@ -100,15 +100,16 @@ export default function ClubHubNav({ active = null, loginRedirect = "/club-hub" 
       style={{ backgroundColor: CLUB_HUB_MAROON }}
       aria-label="Club Hub"
     >
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-6 px-4 py-[1.006rem] text-sm font-semibold tracking-wide text-white sm:gap-10 sm:text-base md:gap-12">
+      <div className="mx-auto flex w-full max-w-7xl flex-nowrap items-center justify-center gap-6 px-4 py-[1.006rem] text-sm font-semibold tracking-wide text-white sm:gap-10 sm:text-base md:gap-12">
         {navItem("Home", active === "home", "/club-hub")}
         {navItem("Club Directory", active === "directory", "/club-hub/directory")}
+        {navItem("Opportunities & Resources", active === "resources", "/club-hub/resources")}
         {user
           ? navItem("Seminar Clubs", active === "meeting-days", "/club-hub/meeting-days")
           : null}
         {showSponsorLink ? navItem("My clubs", active === "sponsor", "/club-hub/sponsor") : null}
         {showAdminLink ? navItem(adminNavLabel, active === "admin", "/club-hub/admin") : null}
-        <div className="relative" ref={dropdownRef} suppressHydrationWarning>
+        <div className="relative shrink-0" ref={dropdownRef} suppressHydrationWarning>
           {!loading && user ? (
             <>
               <button
@@ -150,7 +151,7 @@ export default function ClubHubNav({ active = null, loginRedirect = "/club-hub" 
               )}
             </>
           ) : (
-            <span className="inline-flex flex-wrap items-center justify-center gap-x-1">
+            <span className="inline-flex shrink-0 flex-nowrap items-center justify-center gap-x-1 whitespace-nowrap">
               <Link href={loginHref} className={clubHubNavLinkClass}>
                 Log in
               </Link>

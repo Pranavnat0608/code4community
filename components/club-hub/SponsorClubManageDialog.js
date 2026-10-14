@@ -5,12 +5,13 @@ import Link from "next/link";
 import ClubBoardMembersPanel from "@/components/club-hub/ClubBoardMembersPanel";
 import ClubHubClubExtraEditorsPanel from "@/components/club-hub/ClubHubClubExtraEditorsPanel";
 import ClubHubClubSponsorsEditor from "@/components/club-hub/ClubHubClubSponsorsEditor";
+import ClubHubMemberSignupLimitPanel from "@/components/club-hub/ClubHubMemberSignupLimitPanel";
 import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
 import { membershipHasBoardGroup } from "@/lib/club-hub/boardMembersClient";
 import { formatJoinedAt } from "@/lib/club-hub/clubMemberships";
 
 /**
- * @typedef {"menu" | "roster" | "board" | "editors" | "sponsors"} ClubManageDialogPanel
+ * @typedef {"menu" | "roster" | "board" | "memberLimit" | "editors" | "sponsors"} ClubManageDialogPanel
  */
 
 /**
@@ -27,6 +28,10 @@ import { formatJoinedAt } from "@/lib/club-hub/clubMemberships";
  *   onClose: () => void,
  *   dialogMessage?: string,
  *   dialogError?: string,
+ *   user?: { uid: string } | null,
+ *   onDialogMessage?: (text: string) => void,
+ *   onDialogError?: (text: string) => void,
+ *   onMemberLimitSaved?: () => void | Promise<void>,
  *   adminAccess?: {
  *     records: NonNullable<ReturnType<import("@/lib/club-hub/clubHubRoles").normalizeAccessRecord>>[],
  *     sponsorOverrides: Record<string, unknown>,
@@ -52,6 +57,10 @@ export default function SponsorClubManageDialog({
   onClose,
   dialogMessage = "",
   dialogError = "",
+  user = null,
+  onDialogMessage: onDialogMessageProp,
+  onDialogError: onDialogErrorProp,
+  onMemberLimitSaved,
   adminAccess = null,
 }) {
   const closeButtonRef = useRef(null);
@@ -145,6 +154,18 @@ export default function SponsorClubManageDialog({
                   Edit board members
                   <span className="mt-0.5 block text-xs font-normal text-neutral-600">
                     Grant edit access &amp; board roster
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={actionBtn}
+                onClick={() => onPanelChange("memberLimit")}
+              >
+                <span>
+                  Member signup limit
+                  <span className="mt-0.5 block text-xs font-normal text-neutral-600">
+                    Optional cap on site join signups
                   </span>
                 </span>
               </button>
@@ -247,6 +268,24 @@ export default function SponsorClubManageDialog({
 
           {panel === "board" ? (
             <ClubBoardMembersPanel clubSlug={club.slug} clubName={club.name} compact embed />
+          ) : null}
+
+          {panel === "memberLimit" ? (
+            <ClubHubMemberSignupLimitPanel
+              clubSlug={club.slug}
+              clubName={club.name}
+              memberCount={metrics?.members ?? 0}
+              user={variant === "admin" && adminAccess?.user ? adminAccess.user : user}
+              onMessage={(text) => {
+                if (variant === "admin" && adminAccess) adminAccess.onDialogMessage(text);
+                else onDialogMessageProp?.(text);
+              }}
+              onError={(text) => {
+                if (variant === "admin" && adminAccess) adminAccess.onDialogError(text);
+                else onDialogErrorProp?.(text);
+              }}
+              onSaved={onMemberLimitSaved}
+            />
           ) : null}
 
           {panel === "editors" && variant === "admin" && adminAccess ? (

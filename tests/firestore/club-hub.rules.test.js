@@ -72,6 +72,41 @@ describe.skipIf(!hasEmulator)("Club Hub Firestore rules", () => {
       );
     });
 
+    it("denies join when the club signup limit is full", async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const adminDb = context.firestore();
+        await setDoc(doc(adminDb, "clubHubPages", "robotics"), {
+          slug: "robotics",
+          about: "About robotics",
+          memberSignupLimit: 1,
+          updatedAt: serverTimestamp(),
+          updatedBy: "admin",
+        });
+        await setDoc(doc(adminDb, "clubHubMembershipCounts", "robotics"), {
+          clubSlug: "robotics",
+          clubName: "Robotics",
+          memberCount: 1,
+          updatedAt: serverTimestamp(),
+        });
+      });
+
+      const bob = testEnv.authenticatedContext("bob", {
+        email: "bob@lcps.org",
+      });
+      const db = bob.firestore();
+
+      await assertFails(
+        setDoc(doc(db, "clubHubMemberships", "robotics__bob"), {
+          clubSlug: "robotics",
+          clubName: "Robotics",
+          userId: "bob",
+          userEmail: "bob@lcps.org",
+          displayName: "Bob",
+          joinedAt: serverTimestamp(),
+        }),
+      );
+    });
+
     it("denies creating membership for another user", async () => {
       const alice = testEnv.authenticatedContext("alice", {
         email: "alice@lcps.org",

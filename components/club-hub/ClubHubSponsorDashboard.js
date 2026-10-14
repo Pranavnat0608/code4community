@@ -8,6 +8,7 @@ import { getSortedClubOptions } from "@/lib/club-hub/broadRunClubDirectory";
  * @param {{ allowedSlugs: string[], accessLoading?: boolean }} props
  */
 export default function ClubHubSponsorDashboard({ allowedSlugs, accessLoading = false }) {
+  const { user } = useAuth();
   const clubOptions = getSortedClubOptions();
 
   if (accessLoading) {
@@ -34,7 +35,12 @@ export default function ClubHubSponsorDashboard({ allowedSlugs, accessLoading = 
           Select a club below to view its roster or edit board members.
         </p>
       </div>
-      <ClubHubRostersPanel mode="sponsor" clubOptions={clubOptions} allowedSlugs={allowedSlugs} />
+      <ClubHubRostersPanel
+        mode="sponsor"
+        clubOptions={clubOptions}
+        allowedSlugs={allowedSlugs}
+        user={user}
+      />
     </div>
   );
 }

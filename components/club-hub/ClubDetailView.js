@@ -31,6 +31,11 @@ import {
   joinClub,
   leaveClub,
 } from "@/lib/club-hub/clubMemberships";
+import { fetchClubMembershipCount } from "@/lib/club-hub/clubMembershipCounts";
+import {
+  formatMemberSignupStatus,
+  isClubMembershipFull,
+} from "@/lib/club-hub/memberSignupLimit";
 import { notifyRosterSheetSync } from "@/lib/club-hub/notifyRosterSheetSync";
 import { notifyMeetingChoicesSheetSync } from "@/lib/club-hub/notifyMeetingChoicesSheetSync";
 import { resolveDisplayName } from "@/lib/profile";
@@ -135,6 +140,7 @@ export default function ClubDetailView({ club, slug }) {
   const [membershipLoading, setMembershipLoading] = useState(true);
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinMessage, setJoinMessage] = useState("");
+  const [liveMemberCount, setLiveMemberCount] = useState(0);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -144,10 +150,14 @@ export default function ClubDetailView({ club, slug }) {
       if (cancelled) return;
       setLoadingInfo(true);
       try {
-        const data = await fetchClubPageInfo(slug, sponsorOverrides);
+        const [data, count] = await Promise.all([
+          fetchClubPageInfo(slug, sponsorOverrides),
+          fetchClubMembershipCount(slug),
+        ]);
         if (!cancelled) {
           setInfo(data);
           setDraft(data);
+          setLiveMemberCount(count);
         }
       } catch (err) {
         if (!cancelled) {
@@ -213,6 +223,16 @@ export default function ClubDetailView({ club, slug }) {
     };
   }, [slug, user?.uid]);
 
+  const membershipFull = useMemo(
+    () => isClubMembershipFull(liveMemberCount, info.memberSignupLimit),
+    [liveMemberCount, info.memberSignupLimit],
+  );
+
+  const memberSignupStatus = useMemo(
+    () => formatMemberSignupStatus(liveMemberCount, info.memberSignupLimit),
+    [liveMemberCount, info.memberSignupLimit],
+  );
+
   const upcomingEvents = useMemo(
     () =>
       clubEvents
@@ -260,6 +280,7 @@ export default function ClubDetailView({ club, slug }) {
       await notifyMeetingChoicesSheetSync(user);
       await notifyRosterSheetSync(user, "leave", slug);
       setIsMember(false);
+      setLiveMemberCount((c) => Math.max(0, c - 1));
       setJoinMessage("You left this club.");
     } catch (err) {
       setError(err.message || "Could not update membership.");
@@ -283,6 +304,7 @@ export default function ClubDetailView({ club, slug }) {
       });
       await notifyRosterSheetSync(user, "join", slug);
       setIsMember(true);
+      setLiveMemberCount((c) => c + 1);
       setJoinMessage("You joined this club!");
     } catch (err) {
       setError(err.message || "Could not update membership.");
@@ -456,6 +478,8 @@ export default function ClubDetailView({ club, slug }) {
                     membershipLoading={membershipLoading}
                     isMember={isMember}
                     joinBusy={joinBusy}
+                    joinBlocked={membershipFull}
+                    joinBlockedLabel="Full"
                     onJoin={handleJoinClub}
                     onLeave={handleLeaveClub}
                   />
@@ -493,6 +517,12 @@ export default function ClubDetailView({ club, slug }) {
                 <InfoRow label="Number of members">
                   {info.memberCount || (loadingInfo ? "…" : "—")}
                 </InfoRow>
+                {memberSignupStatus ? (
+                  <InfoRow label="Site signups">
+                    {loadingInfo ? "…" : memberSignupStatus}
+                    {membershipFull && !isMember ? " · full" : ""}
+                  </InfoRow>
+                ) : null}
               </div>
             </section>
           </div>

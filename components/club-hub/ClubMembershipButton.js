@@ -16,6 +16,8 @@ import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
  *   membershipLoading: boolean,
  *   isMember: boolean,
  *   joinBusy: boolean,
+ *   joinBlocked?: boolean,
+ *   joinBlockedLabel?: string,
  *   onJoin: () => void | Promise<void>,
  *   onLeave: () => void | Promise<void>,
  * }} props
@@ -29,6 +31,8 @@ export default function ClubMembershipButton({
   membershipLoading,
   isMember,
   joinBusy,
+  joinBlocked = false,
+  joinBlockedLabel = "Full",
   onJoin,
   onLeave,
 }) {
@@ -39,6 +43,20 @@ export default function ClubMembershipButton({
   }
 
   if (user) {
+    if (!isMember && joinBlocked) {
+      return (
+        <button
+          type="button"
+          disabled
+          aria-disabled="true"
+          title={joinBlockedLabel}
+          className="shrink-0 cursor-not-allowed rounded-lg border border-neutral-300 bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600 shadow-sm sm:px-3.5 sm:py-1.5 sm:text-sm"
+        >
+          {joinBlockedLabel}
+        </button>
+      );
+    }
+
     return (
       <>
         <button

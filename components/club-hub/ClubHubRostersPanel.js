@@ -289,6 +289,10 @@ export default function ClubHubRostersPanel({
             onClose={closeSponsorDialog}
             dialogMessage={dialogMessage}
             dialogError={dialogError}
+            user={user}
+            onDialogMessage={setDialogMessage}
+            onDialogError={setDialogError}
+            onMemberLimitSaved={loadSummary}
             {...rosterRemoveProps}
           />
         </>
@@ -347,6 +351,7 @@ export default function ClubHubRostersPanel({
             onClose={closeAdminDialog}
             dialogMessage={dialogMessage}
             dialogError={dialogError}
+            onMemberLimitSaved={loadSummary}
             {...rosterRemoveProps}
             adminAccess={
               adminAccess

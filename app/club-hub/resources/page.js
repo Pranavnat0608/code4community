@@ -14,7 +14,7 @@ export default function ClubHubResourcesPage() {
   return (
     <div className="min-h-screen bg-neutral-100 text-neutral-900">
       <ClubHubSkipLink />
-      <ClubHubNav active={null} loginRedirect="/club-hub/resources" />
+      <ClubHubNav active="resources" loginRedirect="/club-hub/resources" />
 
       <main
         id={CLUB_HUB_MAIN_ID}

@@ -7,6 +7,10 @@ import {
   mergeLcpsDaysIntoEventsByDate,
 } from "@/lib/club-hub/lcpsSchoolCalendar2026";
 import {
+  mergeActivityBusWednesdays,
+  sortCalendarEventsByDateMap,
+} from "@/lib/club-hub/calendarEventOrder";
+import {
   getSpartanDayHighlightKind,
   mergeSpartanScheduleIntoEventsByDate,
   SPARTAN_SCHEDULE_LABEL,
@@ -248,6 +252,9 @@ function monthEventChipClass(ev) {
   if (ev.isLcpsCalendar) {
     return "truncate rounded-md bg-slate-100 px-1 py-0.5 text-[9px] font-medium leading-tight text-slate-800 ring-1 ring-slate-300 sm:text-[10px]";
   }
+  if (ev.isActivityBus) {
+    return "truncate rounded-md bg-violet-100 px-1 py-0.5 text-[9px] font-semibold leading-tight text-violet-950 ring-1 ring-violet-300 sm:text-[10px]";
+  }
   return "truncate rounded-md bg-neutral-100 px-1 py-0.5 text-[9px] font-medium leading-tight text-neutral-800 sm:text-[10px]";
 }
 
@@ -257,6 +264,7 @@ function CalendarColorLegend() {
     { label: "Maroon club day", className: "border-2 border-[#5c1417] bg-rose-100" },
     { label: "Advisory", className: "border-2 border-sky-400 bg-sky-100" },
     { label: "Planned event", className: "border-2 border-yellow-500 bg-yellow-100" },
+    { label: "Activity Bus", className: "border-2 border-violet-400 bg-violet-100" },
     { label: "No school (LCPS)", hatch: true },
   ];
   return (
@@ -308,8 +316,9 @@ function EventBlock({ ev, isSelectedCol }) {
   const schedule = scheduleStyles(ev.scheduleKind);
   const lcpsNoSchool = ev.isLcpsNoSchool;
   const lcpsInfo = ev.isLcpsCalendar && !lcpsNoSchool;
-  const accent = !schedule && !lcpsNoSchool && !lcpsInfo && ev.variant === "accent";
-  const hi = !schedule && !lcpsNoSchool && !lcpsInfo && ev.highlight;
+  const activityBus = ev.isActivityBus;
+  const accent = !schedule && !lcpsNoSchool && !lcpsInfo && !activityBus && ev.variant === "accent";
+  const hi = !schedule && !lcpsNoSchool && !lcpsInfo && !activityBus && ev.highlight;
 
   let box =
     "mx-2 my-1 rounded-md border border-neutral-200 bg-neutral-100 px-1.5 py-2 text-center";
@@ -318,6 +327,9 @@ function EventBlock({ ev, isSelectedCol }) {
   } else if (lcpsInfo) {
     box =
       "mx-1.5 my-1 rounded-lg border border-slate-300 bg-slate-100 px-2 py-2 text-center text-slate-900 shadow-sm";
+  } else if (activityBus) {
+    box =
+      "mx-1.5 my-1 rounded-lg border border-violet-400 bg-violet-100 px-2 py-2 text-center text-violet-950 shadow-sm";
   } else if (schedule) {
     box = schedule.box;
   } else if (accent) {
@@ -332,7 +344,9 @@ function EventBlock({ ev, isSelectedCol }) {
     ? "text-[12px] font-semibold leading-tight text-neutral-700"
     : lcpsInfo
       ? "text-[12px] font-medium leading-tight text-slate-700"
-      : schedule
+      : activityBus
+        ? "text-[12px] font-semibold leading-tight text-violet-900"
+        : schedule
       ? schedule.time
       : accent
         ? "text-[12px] font-normal leading-tight text-rose-900"
@@ -341,7 +355,9 @@ function EventBlock({ ev, isSelectedCol }) {
     ? "mt-0.5 text-[13px] font-bold leading-snug text-neutral-900"
     : lcpsInfo
       ? "mt-0.5 text-[13px] font-semibold leading-snug text-slate-900"
-      : schedule
+      : activityBus
+        ? "mt-0.5 text-[13px] font-bold leading-snug text-violet-950"
+        : schedule
       ? schedule.title
       : accent
         ? "mt-0.5 text-[12px] font-bold leading-snug text-rose-950"
@@ -350,7 +366,9 @@ function EventBlock({ ev, isSelectedCol }) {
     ? "mt-0.5 text-[10px] font-medium leading-snug text-neutral-600"
     : lcpsInfo
       ? "mt-0.5 text-[10px] leading-snug text-slate-600"
-      : schedule
+      : activityBus
+        ? "mt-0.5 text-[10px] leading-snug text-violet-800"
+        : schedule
       ? schedule.loc
       : accent
         ? "mt-0.5 text-[10px] leading-snug text-rose-800"

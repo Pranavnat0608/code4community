@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAdminFirestore } from "@/lib/firebase/admin";
 import { removeClubMemberFromClub } from "@/lib/club-hub/membershipServer";
 import {
-  assertCanManageBoardMembersForClub,
+  assertCanRemoveClubRosterMembers,
   requireAuthFromBearerToken,
 } from "@/lib/club-hub/sponsorAuthServer";
 import { withRateLimit } from "@/utils/rateLimit";
@@ -33,7 +33,7 @@ async function deleteHandler(request) {
 
   try {
     const auth = await requireAuthFromBearerToken(token);
-    await assertCanManageBoardMembersForClub({ ...auth, clubSlug });
+    await assertCanRemoveClubRosterMembers({ ...auth, clubSlug });
     const result = await removeClubMemberFromClub(db, { clubSlug, userId });
     if (!result.ok) {
       return NextResponse.json({ error: result.error || "Remove failed." }, { status: 500 });
@@ -41,7 +41,10 @@ async function deleteHandler(request) {
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Request failed.";
-    const status = message.includes("permission") || message.includes("Only the") ? 403 : 400;
+    const status =
+      message.includes("permission") || message.includes("Only a") || message.includes("Only the")
+        ? 403
+        : 400;
     return NextResponse.json({ error: message }, { status });
   }
 }

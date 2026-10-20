@@ -125,7 +125,7 @@ export default function ClubHubAdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-neutral-900">Club Hub admin</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-700">
-          Manage coordinators, per-club rosters, and one-off seminar columns on the roster sheet.
+          Manage coordinators and per-club rosters. Seminar columns are on the Student meeting clubs sheet.
         </p>
         <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Club Hub admin sections">
           <button
@@ -256,7 +256,7 @@ export default function ClubHubAdminDashboard() {
           <section className="rounded-[14px] bg-white p-6 shadow-sm ring-1 ring-black/5">
             <h2 className="text-lg font-bold text-neutral-900">Club coordinators</h2>
             <p className="mt-1 text-sm text-neutral-700">
-              Can edit every club page. For sponsors, extra editors, rosters, and board members on
+              Can edit every club page. For sponsors, rosters, board members, and signup limits on
               a specific club, use{" "}
               <button
                 type="button"

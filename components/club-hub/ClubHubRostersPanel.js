@@ -230,7 +230,7 @@ export default function ClubHubRostersPanel({
         <h2 className="text-lg font-bold text-neutral-900">Rosters &amp; metrics</h2>
         <p className="mt-1 text-sm text-neutral-700">
           {mode === "admin"
-            ? "Member counts across all clubs. Type a club name, open its card, then choose roster, board, editors, or sponsors."
+            ? "Member counts across all clubs. Type a club name, open its card, then choose roster, board, membership, or sponsors."
             : "Choose a club to view its roster or manage board members."}
         </p>
       </div>
@@ -321,7 +321,7 @@ export default function ClubHubRostersPanel({
 
             {!selectedClub ? (
               <p className="mt-4 text-sm text-neutral-700">
-                Type a club name to manage roster, board, editors, and sponsors.
+                Type a club name to manage roster, board, membership, and sponsors.
               </p>
             ) : (
               <div className="mt-5 max-w-md">

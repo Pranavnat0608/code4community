@@ -36,6 +36,12 @@ import {
   formatMemberSignupStatus,
   isClubMembershipFull,
 } from "@/lib/club-hub/memberSignupLimit";
+import { clubRequiresJoinApproval } from "@/lib/club-hub/joinPolicy";
+import {
+  cancelJoinRequest,
+  fetchUserJoinRequest,
+  requestToJoinClub,
+} from "@/lib/club-hub/joinRequests";
 import { notifyRosterSheetSync } from "@/lib/club-hub/notifyRosterSheetSync";
 import { notifyMeetingChoicesSheetSync } from "@/lib/club-hub/notifyMeetingChoicesSheetSync";
 import { resolveDisplayName } from "@/lib/profile";
@@ -141,6 +147,7 @@ export default function ClubDetailView({ club, slug }) {
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinMessage, setJoinMessage] = useState("");
   const [liveMemberCount, setLiveMemberCount] = useState(0);
+  const [joinRequestPending, setJoinRequestPending] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -204,16 +211,26 @@ export default function ClubDetailView({ club, slug }) {
       if (cancelled) return;
       if (!user?.uid) {
         setIsMember(false);
+        setJoinRequestPending(false);
         setMembershipLoading(false);
         return;
       }
       setMembershipLoading(true);
       try {
-        const membership = await fetchUserClubMembership(slug, user.uid);
-        if (!cancelled) setIsMember(!!membership);
+        const [membership, request] = await Promise.all([
+          fetchUserClubMembership(slug, user.uid),
+          fetchUserJoinRequest(slug, user.uid),
+        ]);
+        if (!cancelled) {
+          setIsMember(!!membership);
+          setJoinRequestPending(!!request && !membership);
+        }
       } catch (err) {
         logClientError("ClubDetailView.membership", err);
-        if (!cancelled) setIsMember(false);
+        if (!cancelled) {
+          setIsMember(false);
+          setJoinRequestPending(false);
+        }
       } finally {
         if (!cancelled) setMembershipLoading(false);
       }
@@ -289,23 +306,48 @@ export default function ClubDetailView({ club, slug }) {
     }
   };
 
+  const handleCancelJoinRequest = async () => {
+    if (!user?.uid || joinBusy || !joinRequestPending) return;
+    if (!window.confirm("Cancel your request to join this club?")) return;
+    setJoinBusy(true);
+    setJoinMessage("");
+    setError("");
+    try {
+      await cancelJoinRequest({ clubSlug: slug, userId: user.uid });
+      setJoinRequestPending(false);
+      setJoinMessage("Join request canceled.");
+    } catch (err) {
+      setError(err.message || "Could not cancel the request.");
+    } finally {
+      setJoinBusy(false);
+    }
+  };
+
   const handleJoinClub = async () => {
     if (!user?.uid || joinBusy || isMember) return;
     setJoinBusy(true);
     setJoinMessage("");
     setError("");
+    const profile = {
+      clubSlug: slug,
+      clubName: club.name,
+      userId: user.uid,
+      userEmail: user.email || userData?.email || "",
+      displayName: resolveDisplayName(userData, user.displayName || "Member"),
+    };
     try {
-      await joinClub({
-        clubSlug: slug,
-        clubName: club.name,
-        userId: user.uid,
-        userEmail: user.email || userData?.email || "",
-        displayName: resolveDisplayName(userData, user.displayName || "Member"),
-      });
-      await notifyRosterSheetSync(user, "join", slug);
-      setIsMember(true);
-      setLiveMemberCount((c) => c + 1);
-      setJoinMessage("You joined this club!");
+      if (clubRequiresJoinApproval(info.joinPolicy)) {
+        await requestToJoinClub(profile);
+        setJoinRequestPending(true);
+        setJoinMessage("Request sent. A sponsor or board member needs to approve you.");
+      } else {
+        await joinClub(profile);
+        await notifyRosterSheetSync(user, "join", slug);
+        setIsMember(true);
+        setJoinRequestPending(false);
+        setLiveMemberCount((c) => c + 1);
+        setJoinMessage("You joined this club!");
+      }
     } catch (err) {
       setError(err.message || "Could not update membership.");
       throw err;
@@ -396,6 +438,14 @@ export default function ClubDetailView({ club, slug }) {
           <h1 className="max-w-5xl text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl">
             {club.name}
           </h1>
+          {slug === "unicef" ? (
+            <Link
+              href="/unicef"
+              className={`mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#5c1417] shadow-sm ${clubHubButtonFocusClass}`}
+            >
+              Open hour tracker
+            </Link>
+          ) : null}
         </div>
       </section>
 
@@ -480,8 +530,11 @@ export default function ClubDetailView({ club, slug }) {
                     joinBusy={joinBusy}
                     joinBlocked={membershipFull}
                     joinBlockedLabel="Full"
+                    requiresApproval={clubRequiresJoinApproval(info.joinPolicy)}
+                    requestPending={joinRequestPending}
                     onJoin={handleJoinClub}
                     onLeave={handleLeaveClub}
+                    onCancelRequest={handleCancelJoinRequest}
                   />
                 )}
               </div>

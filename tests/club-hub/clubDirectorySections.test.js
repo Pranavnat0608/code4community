@@ -47,6 +47,22 @@ describe("getClubsGroupedByMeetingDay", () => {
     expect(requiresBoardForMaroonMeetingPick("interact")).toBe(true);
   });
 
+  it("lists Baking Club in General and not on Maroon", () => {
+    const { general, maroon } = getClubsGroupedByMeetingDay();
+    expect(general.some((c) => c.slug === "baking-club")).toBe(true);
+    expect(maroon.some((c) => c.slug === "baking-club")).toBe(false);
+    expect(isMaroonDayClubSlug("baking-club")).toBe(false);
+  });
+
+  it("lists Green Team in General and keeps Sports Talk off Maroon", () => {
+    const { general, gold, maroon } = getClubsGroupedByMeetingDay();
+    expect(general.some((c) => c.slug === "green-team")).toBe(true);
+    expect(general.find((c) => c.slug === "green-team")?.name).toBe("Green Team");
+    expect(gold.some((c) => c.slug === "sports-talk")).toBe(true);
+    expect(maroon.some((c) => c.slug === "sports-talk")).toBe(false);
+    expect(isMaroonDayClubSlug("sports-talk")).toBe(false);
+  });
+
   it("lists Key Club in General and Gold (Board only)", () => {
     const { general, gold } = getClubsGroupedByMeetingDay();
     expect(general.some((c) => c.slug === "key-club")).toBe(true);

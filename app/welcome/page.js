@@ -64,7 +64,12 @@ export default function Welcome() {
         isActive: true,
         path: "/club-hub",
       },
-      { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },
+      {
+        name: "UNICEF",
+        description: "Volunteer hours, opportunities, and group totals",
+        isActive: true,
+        path: "/unicef",
+      },
       { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },
       { name: "Coming Soon", description: "More features coming soon", isActive: false, path: null },
     ],

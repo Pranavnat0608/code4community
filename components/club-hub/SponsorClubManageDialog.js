@@ -3,15 +3,14 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import ClubBoardMembersPanel from "@/components/club-hub/ClubBoardMembersPanel";
-import ClubHubClubExtraEditorsPanel from "@/components/club-hub/ClubHubClubExtraEditorsPanel";
 import ClubHubClubSponsorsEditor from "@/components/club-hub/ClubHubClubSponsorsEditor";
-import ClubHubMemberSignupLimitPanel from "@/components/club-hub/ClubHubMemberSignupLimitPanel";
+import ClubHubJoinPolicyPanel from "@/components/club-hub/ClubHubJoinPolicyPanel";
 import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
 import { membershipHasBoardGroup } from "@/lib/club-hub/boardMembersClient";
 import { formatJoinedAt } from "@/lib/club-hub/clubMemberships";
 
 /**
- * @typedef {"menu" | "roster" | "board" | "memberLimit" | "editors" | "sponsors"} ClubManageDialogPanel
+ * @typedef {"menu" | "roster" | "board" | "membership" | "sponsors"} ClubManageDialogPanel
  */
 
 /**
@@ -28,7 +27,7 @@ import { formatJoinedAt } from "@/lib/club-hub/clubMemberships";
  *   onClose: () => void,
  *   dialogMessage?: string,
  *   dialogError?: string,
- *   user?: { uid: string } | null,
+ *   user?: { uid: string, getIdToken?: () => Promise<string> } | null,
  *   onDialogMessage?: (text: string) => void,
  *   onDialogError?: (text: string) => void,
  *   onMemberLimitSaved?: () => void | Promise<void>,
@@ -160,29 +159,17 @@ export default function SponsorClubManageDialog({
               <button
                 type="button"
                 className={actionBtn}
-                onClick={() => onPanelChange("memberLimit")}
+                onClick={() => onPanelChange("membership")}
               >
                 <span>
-                  Member signup limit
+                  Membership
                   <span className="mt-0.5 block text-xs font-normal text-neutral-600">
-                    Optional cap on site join signups
+                    Open join or approval, and an optional signup cap
                   </span>
                 </span>
               </button>
               {variant === "admin" && adminAccess ? (
                 <>
-                  <button
-                    type="button"
-                    className={actionBtn}
-                    onClick={() => onPanelChange("editors")}
-                  >
-                    <span>
-                      Extra club editors
-                      <span className="mt-0.5 block text-xs font-normal text-neutral-600">
-                        Manual edit access for this club
-                      </span>
-                    </span>
-                  </button>
                   <button
                     type="button"
                     className={actionBtn}
@@ -270,8 +257,8 @@ export default function SponsorClubManageDialog({
             <ClubBoardMembersPanel clubSlug={club.slug} clubName={club.name} compact embed />
           ) : null}
 
-          {panel === "memberLimit" ? (
-            <ClubHubMemberSignupLimitPanel
+          {panel === "membership" ? (
+            <ClubHubJoinPolicyPanel
               clubSlug={club.slug}
               clubName={club.name}
               memberCount={metrics?.members ?? 0}
@@ -285,20 +272,6 @@ export default function SponsorClubManageDialog({
                 else onDialogErrorProp?.(text);
               }}
               onSaved={onMemberLimitSaved}
-            />
-          ) : null}
-
-          {panel === "editors" && variant === "admin" && adminAccess ? (
-            <ClubHubClubExtraEditorsPanel
-              clubSlug={club.slug}
-              clubName={club.name}
-              records={adminAccess.records}
-              user={adminAccess.user}
-              busy={adminAccess.busy}
-              onBusyChange={adminAccess.onBusyChange}
-              onMessage={adminAccess.onDialogMessage}
-              onError={adminAccess.onDialogError}
-              onSaved={adminAccess.onAccessMutated}
             />
           ) : null}
 

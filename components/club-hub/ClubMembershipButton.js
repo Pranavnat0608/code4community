@@ -18,8 +18,11 @@ import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
  *   joinBusy: boolean,
  *   joinBlocked?: boolean,
  *   joinBlockedLabel?: string,
+ *   requiresApproval?: boolean,
+ *   requestPending?: boolean,
  *   onJoin: () => void | Promise<void>,
  *   onLeave: () => void | Promise<void>,
+ *   onCancelRequest?: () => void | Promise<void>,
  * }} props
  */
 export default function ClubMembershipButton({
@@ -33,8 +36,11 @@ export default function ClubMembershipButton({
   joinBusy,
   joinBlocked = false,
   joinBlockedLabel = "Full",
+  requiresApproval = false,
+  requestPending = false,
   onJoin,
   onLeave,
+  onCancelRequest,
 }) {
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
 
@@ -57,6 +63,23 @@ export default function ClubMembershipButton({
       );
     }
 
+    if (!isMember && requestPending) {
+      return (
+        <button
+          type="button"
+          onClick={() => onCancelRequest?.()}
+          disabled={joinBusy || !onCancelRequest}
+          aria-busy={joinBusy}
+          title="Cancel your join request"
+          className={`shrink-0 rounded-lg border border-[#5c1417]/30 bg-white px-3 py-1 text-xs font-semibold text-[#5c1417] shadow-sm hover:bg-rose-50 disabled:opacity-50 sm:px-3.5 sm:py-1.5 sm:text-sm ${clubHubButtonFocusClass}`}
+        >
+          {joinBusy ? "Saving…" : "Requested"}
+        </button>
+      );
+    }
+
+    const joinLabel = requiresApproval ? "Request to join" : "Join club";
+
     return (
       <>
         <button
@@ -68,7 +91,7 @@ export default function ClubMembershipButton({
           disabled={joinBusy}
           aria-busy={joinBusy}
           aria-haspopup={isMember ? undefined : "dialog"}
-          aria-label={isMember ? "Leave club" : "Join club"}
+          aria-label={isMember ? "Leave club" : joinLabel}
           className={`shrink-0 rounded-lg px-3 py-1 text-xs font-semibold shadow-sm sm:px-3.5 sm:py-1.5 sm:text-sm disabled:opacity-50 ${clubHubButtonFocusClass} ${
             isMember
               ? "border border-[#5c1417]/30 bg-white text-[#5c1417] hover:bg-rose-50"
@@ -76,13 +99,14 @@ export default function ClubMembershipButton({
           }`}
           style={isMember ? undefined : { backgroundColor: CLUB_HUB_MAROON }}
         >
-          {joinBusy ? "Saving…" : isMember ? "Joined" : "Join club"}
+          {joinBusy ? "Saving…" : isMember ? "Joined" : joinLabel}
         </button>
 
         <ClubJoinConfirmDialog
           key={joinDialogOpen ? "join-open" : "join-closed"}
           open={joinDialogOpen}
           clubName={clubName}
+          requestMode={requiresApproval}
           busy={joinBusy}
           onClose={() => {
             if (!joinBusy) setJoinDialogOpen(false);

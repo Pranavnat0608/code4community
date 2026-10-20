@@ -9,11 +9,19 @@ import { CLUB_HUB_MAROON } from "@/lib/club-hub/theme";
  *   open: boolean,
  *   clubName: string,
  *   busy: boolean,
+ *   requestMode?: boolean,
  *   onClose: () => void,
  *   onConfirm: () => void,
  * }} props
  */
-export default function ClubJoinConfirmDialog({ open, clubName, busy, onClose, onConfirm }) {
+export default function ClubJoinConfirmDialog({
+  open,
+  clubName,
+  busy,
+  requestMode = false,
+  onClose,
+  onConfirm,
+}) {
   const titleId = useId();
   const descId = useId();
   const checkboxId = useId();
@@ -45,11 +53,12 @@ export default function ClubJoinConfirmDialog({ open, clubName, busy, onClose, o
         className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl sm:p-6"
       >
         <h2 id={titleId} className="text-lg font-bold text-neutral-900">
-          Join {clubName}?
+          {requestMode ? `Request to join ${clubName}?` : `Join ${clubName}?`}
         </h2>
         <p id={descId} className="mt-2 text-sm leading-relaxed text-neutral-700">
-          Club membership is a commitment. If you join, we expect you to participate regularly and
-          represent the club responsibly at meetings and activities.
+          {requestMode
+            ? "A sponsor or board member must approve you before you are a member. Club membership is a commitment to participate regularly."
+            : "Club membership is a commitment. If you join, we expect you to participate regularly and represent the club responsibly at meetings and activities."}
         </p>
 
         <label
@@ -87,7 +96,7 @@ export default function ClubJoinConfirmDialog({ open, clubName, busy, onClose, o
             className={`rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${clubHubButtonFocusClass}`}
             style={{ backgroundColor: CLUB_HUB_MAROON }}
           >
-            {busy ? "Joining…" : "Confirm join"}
+            {busy ? "Saving…" : requestMode ? "Send request" : "Confirm join"}
           </button>
         </div>
       </div>

@@ -1097,7 +1097,10 @@
                                   request.resource.data.memberSignupLimit == null ||
                                   (request.resource.data.memberSignupLimit is int &&
                                     request.resource.data.memberSignupLimit >= 1 &&
-                                    request.resource.data.memberSignupLimit <= 5000));
+                                    request.resource.data.memberSignupLimit <= 5000)) &&
+                                (!('joinPolicy' in request.resource.data) ||
+                                  request.resource.data.joinPolicy == 'open' ||
+                                  request.resource.data.joinPolicy == 'approval');
         allow delete: if isClubHubAdmin();
       }
 
@@ -1123,6 +1126,11 @@
       function clubHubCanAcceptNewMember(clubSlug) {
         return !clubHubHasMemberSignupLimit(clubSlug) ||
                clubHubMembershipCountForSlug(clubSlug) < clubHubMemberSignupLimitForSlug(clubSlug);
+      }
+
+      function clubHubJoinRequiresApproval(clubSlug) {
+        let pagePath = /databases/$(database)/documents/clubHubPages/$(clubSlug);
+        return exists(pagePath) && get(pagePath).data.get('joinPolicy', 'open') == 'approval';
       }
 
       function clubHubMembershipCountIncrementAllowed(clubSlug, newCount) {
@@ -1215,10 +1223,53 @@
         allow create: if isAuthenticated() &&
                         membershipId == clubHubMembershipDocIdForWrite() &&
                         isValidClubHubMembershipWrite() &&
-                        clubHubCanAcceptNewMember(request.resource.data.clubSlug);
+                        clubHubCanAcceptNewMember(request.resource.data.clubSlug) &&
+                        !clubHubJoinRequiresApproval(request.resource.data.clubSlug);
         allow update: if false;
         allow delete: if isAuthenticated() &&
                         resource.data.userId == request.auth.uid;
+      }
+
+      function isValidClubHubJoinRequestCreate() {
+        return request.resource.data.clubSlug is string &&
+              request.resource.data.clubSlug.size() > 0 &&
+              request.resource.data.clubSlug.size() <= 120 &&
+              request.resource.data.clubName is string &&
+              request.resource.data.clubName.size() > 0 &&
+              request.resource.data.clubName.size() <= 120 &&
+              request.resource.data.userId is string &&
+              request.resource.data.userId == request.auth.uid &&
+              request.resource.data.userEmail is string &&
+              request.resource.data.userEmail.size() > 0 &&
+              request.resource.data.userEmail.size() <= 128 &&
+              request.resource.data.userEmail == normalizeEmail(request.resource.data.userEmail) &&
+              emailsMatch(request.resource.data.userEmail, request.auth.token.email) &&
+              request.resource.data.displayName is string &&
+              request.resource.data.displayName.size() > 0 &&
+              request.resource.data.displayName.size() <= 100 &&
+              request.resource.data.status == 'pending' &&
+              request.resource.data.requestedAt is timestamp &&
+              clubHubJoinRequiresApproval(request.resource.data.clubSlug) &&
+              clubHubCanAcceptNewMember(request.resource.data.clubSlug) &&
+              !exists(/databases/$(database)/documents/clubHubMemberships/$(request.resource.data.clubSlug + '__' + request.auth.uid));
+      }
+
+      match /clubHubJoinRequests/{requestId} {
+        allow get: if isAuthenticated() && (
+          requestId.matches('^.+__' + request.auth.uid + '$') ||
+          (resource != null && canEditClubHubPage(resource.data.clubSlug))
+        );
+        allow list: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          canEditClubHubPage(resource.data.clubSlug)
+        );
+        allow create: if isAuthenticated() &&
+                        requestId == request.resource.data.clubSlug + '__' + request.auth.uid &&
+                        isValidClubHubJoinRequestCreate();
+        allow update: if false;
+        allow delete: if isAuthenticated() &&
+                        resource.data.userId == request.auth.uid &&
+                        resource.data.status == 'pending';
       }
 
       function isValidClubHubMembershipCountFields() {
@@ -1368,6 +1419,76 @@
                                 request.resource.data.updatedAt is timestamp &&
                                 request.resource.data.updatedBy == request.auth.uid;
         allow delete: if isSiteAdmin();
+      }
+
+      function unicefProfilePath() {
+        return /databases/$(database)/documents/unicefProfiles/$(request.auth.uid);
+      }
+
+      function isUnicefOfficer() {
+        return isSiteAdmin() ||
+          canEditClubHubPage('unicef') ||
+          (isAuthenticated() &&
+            exists(unicefProfilePath()) &&
+            get(unicefProfilePath()).data.role in ['board', 'sponsor']);
+      }
+
+      function unicefMemberKeepsRole() {
+        return request.resource.data.role == resource.data.role;
+      }
+
+      match /unicefSettings/{docId} {
+        allow read: if true;
+        allow create, update: if isUnicefOfficer() && docId == 'config';
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefProfiles/{uid} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                        request.auth.uid == uid &&
+                        request.resource.data.role == 'member';
+        allow update: if isAuthenticated() &&
+                        ((request.auth.uid == uid && unicefMemberKeepsRole()) || isUnicefOfficer());
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefSubmissions/{id} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                        request.resource.data.userId == request.auth.uid &&
+                        request.resource.data.status == 'pending' &&
+                        request.resource.data.activityDescription is string &&
+                        request.resource.data.activityDescription.size() >= 10 &&
+                        request.resource.data.activityDescription.size() <= 1000 &&
+                        request.resource.data.hoursCompleted is number &&
+                        request.resource.data.hoursCompleted > 0 &&
+                        request.resource.data.hoursCompleted <= 24 &&
+                        request.resource.data.hourType in ['In Club', 'Out of Club', 'Summer Hours'];
+        allow update: if isUnicefOfficer();
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefProofs/{id} {
+        allow read: if isAuthenticated() &&
+                      (resource.data.userId == request.auth.uid || isUnicefOfficer());
+        allow create: if isAuthenticated() &&
+                        request.resource.data.userId == request.auth.uid &&
+                        request.resource.data.imageData is string &&
+                        request.resource.data.imageData.size() > 0 &&
+                        request.resource.data.imageData.size() <= 700000;
+        allow update, delete: if isUnicefOfficer();
+      }
+
+      match /unicefOpportunities/{id} {
+        allow read: if true;
+        allow create, update, delete: if isUnicefOfficer();
+      }
+
+      match /unicefAnnouncements/{id} {
+        allow read: if true;
+        allow create, delete: if isUnicefOfficer();
+        allow update: if false;
       }
 
       match /{document=**} {

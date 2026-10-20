@@ -61,7 +61,7 @@ export default function ClubHubSpecialSheetEventsPanel() {
       setTitle("");
       setStudentListPaste("");
       await load();
-      let msg = `Added “${result.event?.title || title}” to the roster sheet.`;
+      let msg = `Added “${result.event?.title || title}” to the Student meeting clubs sheet.`;
       if (unmatched.length > 0) {
         msg += ` ${unmatched.length} email(s) had no matching account: ${unmatched.slice(0, 5).join(", ")}${unmatched.length > 5 ? "…" : ""}`;
       }

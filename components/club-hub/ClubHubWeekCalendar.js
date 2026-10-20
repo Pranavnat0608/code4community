@@ -536,9 +536,17 @@ export default function ClubHubWeekCalendar() {
             visibleRange.start,
             visibleRange.end,
           );
-          setEventsByDate(
-            mergeLcpsDaysIntoEventsByDate(withSchool, visibleRange.start, visibleRange.end),
+          const withLcps = mergeLcpsDaysIntoEventsByDate(
+            withSchool,
+            visibleRange.start,
+            visibleRange.end,
           );
+          const withActivityBus = mergeActivityBusWednesdays(
+            withLcps,
+            visibleRange.start,
+            visibleRange.end,
+          );
+          setEventsByDate(sortCalendarEventsByDateMap(withActivityBus));
         }
       } catch {
         if (!cancelled) setEventsByDate({});

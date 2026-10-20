@@ -8,6 +8,7 @@ import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
 import { membershipHasBoardGroup } from "@/lib/club-hub/boardMembersClient";
 import { formatJoinedAt } from "@/lib/club-hub/clubMemberships";
 import { getClubBySlug } from "@/lib/club-hub/broadRunClubDirectory";
+import { useMeetingDayOverrides } from "@/lib/club-hub/clubMeetingDays";
 import {
   canPickClubForGoldMeetingDay,
   canPickClubForMaroonMeetingDay,
@@ -31,6 +32,7 @@ export default function ClubHubAdminStudentsPanel() {
   const [message, setMessage] = useState("");
   const [goldClubSlug, setGoldClubSlug] = useState("");
   const [maroonClubSlug, setMaroonClubSlug] = useState("");
+  const { version: meetingDaysVersion } = useMeetingDayOverrides();
 
   const applyProfile = useCallback((data) => {
     setProfile(data);
@@ -88,12 +90,14 @@ export default function ClubHubAdminStudentsPanel() {
 
   const goldOptions = useMemo(
     () => (profile?.memberships || []).filter((m) => canPickClubForGoldMeetingDay(m)),
-    [profile?.memberships],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-filter when admin meeting days load
+    [profile?.memberships, meetingDaysVersion],
   );
 
   const maroonOptions = useMemo(
     () => (profile?.memberships || []).filter((m) => canPickClubForMaroonMeetingDay(m)),
-    [profile?.memberships],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-filter when admin meeting days load
+    [profile?.memberships, meetingDaysVersion],
   );
 
   const memberships = profile?.memberships || [];

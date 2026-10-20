@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { getClubsGroupedByMeetingDay } from "@/lib/club-hub/clubDirectorySections";
+import { useMeetingDayOverrides } from "@/lib/club-hub/clubMeetingDays";
 /**
  * @param {{ clubs: { name: string, slug: string, key: string }[], buttonClassName: string }} props
  */
@@ -45,6 +46,7 @@ function DirectorySection({ id, title, subtitle, children }) {
 }
 
 export default function BroadRunClubDirectory() {
+  useMeetingDayOverrides();
   const { gold, maroon, general } = getClubsGroupedByMeetingDay();
 
   return (

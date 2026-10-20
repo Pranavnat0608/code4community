@@ -14,6 +14,8 @@ import {
   saveClubMeetingDay,
   useMeetingDayOverrides,
 } from "@/lib/club-hub/clubMeetingDays";
+import { useCustomClubs } from "@/lib/club-hub/customClubs";
+import ClubHubCreateClubForm from "@/components/club-hub/ClubHubCreateClubForm";
 
 const MEETING_DAY_LABELS = {
   gold: "Gold",
@@ -33,13 +35,17 @@ const FILTERS = [
 export default function ClubHubMeetingDaysAdminPanel() {
   const { user } = useAuth();
   const { ready } = useMeetingDayOverrides();
+  const { version: customClubVersion } = useCustomClubs();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const [busySlug, setBusySlug] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
-  const clubOptions = useMemo(() => getSortedClubOptions(), []);
+  const clubOptions = useMemo(
+    () => (customClubVersion >= 0 ? getSortedClubOptions() : []),
+    [customClubVersion],
+  );
   const overrides = getMeetingDayOverrides();
 
   const rows = clubOptions
@@ -106,6 +112,17 @@ export default function ClubHubMeetingDaysAdminPanel() {
         Students signed up for a day the club no longer meets are removed from that signup and
         from the Student meeting clubs sheet.
       </p>
+
+      <ClubHubCreateClubForm
+        onCreated={(clubName) => {
+          setError("");
+          setMessage(`Created ${clubName}.`);
+        }}
+        onError={(text) => {
+          if (text) setMessage("");
+          setError(text);
+        }}
+      />
 
       <ClubHubLiveMessage message={message} />
       <ClubHubLiveMessage message={error} variant="alert" />

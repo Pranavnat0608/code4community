@@ -10,6 +10,7 @@ import ClubHubOpportunityEventsPanel from "@/components/club-hub/ClubHubOpportun
 import ClubHubSpecialSheetEventsPanel from "@/components/club-hub/ClubHubSpecialSheetEventsPanel";
 import ClubHubMeetingDaysAdminPanel from "@/components/club-hub/ClubHubMeetingDaysAdminPanel";
 import { getSortedClubOptions } from "@/lib/club-hub/broadRunClubDirectory";
+import { useCustomClubs } from "@/lib/club-hub/customClubs";
 import {
   PROTECTED_CLUB_HUB_COORDINATOR_EMAIL,
   isProtectedClubHubCoordinator,
@@ -33,7 +34,11 @@ export default function ClubHubAdminDashboard() {
   const [sponsorOverrides, setSponsorOverrides] = useState({});
   const [busy, setBusy] = useState(false);
 
-  const clubOptions = useMemo(() => getSortedClubOptions(), []);
+  const { version: customClubVersion } = useCustomClubs();
+  const clubOptions = useMemo(
+    () => (customClubVersion >= 0 ? getSortedClubOptions() : []),
+    [customClubVersion],
+  );
   const allClubSlugs = useMemo(() => clubOptions.map((club) => club.slug), [clubOptions]);
 
   const loadRecords = useCallback(async () => {
@@ -126,7 +131,7 @@ export default function ClubHubAdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-neutral-900">Club Hub admin</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-700">
-          Manage coordinators, per-club rosters, and Gold / Maroon / General meeting days. Seminar columns are on the Student meeting clubs sheet.
+          Manage coordinators, per-club rosters, and Gold / Maroon / General meeting days. New clubs can be added from Meeting days. Seminar columns are on the Student meeting clubs sheet.
         </p>
         <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Club Hub admin sections">
           <button

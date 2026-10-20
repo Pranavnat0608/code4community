@@ -10,6 +10,7 @@ import {
 } from "@/lib/club-hub/clubDirectorySections";
 import { requiresBoardForMaroonMeetingPick } from "@/lib/club-hub/meetingDayBoardAccess";
 import { BROAD_RUN_CLUBS, clubNameToSlug } from "@/lib/club-hub/broadRunClubDirectory";
+import { setCustomClubs } from "@/lib/club-hub/customClubStore";
 
 describe("getClubsGroupedByMeetingDay", () => {
   it("covers every directory club in gold, maroon, or general", () => {
@@ -78,7 +79,10 @@ describe("getClubsGroupedByMeetingDay", () => {
 });
 
 describe("admin meeting-day overrides", () => {
-  afterEach(() => setMeetingDayOverrides({}));
+  afterEach(() => {
+    setMeetingDayOverrides({});
+    setCustomClubs([]);
+  });
 
   it("moves a General club to Gold", () => {
     setMeetingDayOverrides({ "baking-club": "gold" });
@@ -105,6 +109,22 @@ describe("admin meeting-day overrides", () => {
     expect(gold.some((c) => c.slug === "sports-talk")).toBe(true);
     expect(maroon.some((c) => c.slug === "sports-talk")).toBe(true);
     expect(isMaroonDayClubSlug("sports-talk")).toBe(true);
+  });
+
+  it("lists an admin-created club on the day it meets", () => {
+    setCustomClubs([
+      {
+        slug: "robotics-plus",
+        name: "Robotics Plus",
+        meetingDay: "gold",
+        sponsors: [{ name: "Ada Lovelace", email: "ada@lcps.org" }],
+      },
+    ]);
+    setMeetingDayOverrides({ "robotics-plus": "gold" });
+    const { gold, general } = getClubsGroupedByMeetingDay();
+    expect(gold.some((club) => club.slug === "robotics-plus")).toBe(true);
+    expect(general.some((club) => club.slug === "robotics-plus")).toBe(false);
+    expect(isGoldDayClubSlug("robotics-plus")).toBe(true);
   });
 
   it("ignores invalid override values", () => {

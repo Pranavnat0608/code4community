@@ -98,6 +98,25 @@
         allow delete: if isClubHubAdmin();
       }
 
+      match /clubHubCustomClubs/{slug} {
+        allow read: if true;
+        allow create, update: if isClubHubAdmin() &&
+                                request.resource.data.slug == slug &&
+                                request.resource.data.slug is string &&
+                                request.resource.data.slug.size() > 0 &&
+                                request.resource.data.slug.size() <= 120 &&
+                                request.resource.data.name is string &&
+                                request.resource.data.name.size() > 0 &&
+                                request.resource.data.name.size() <= 120 &&
+                                request.resource.data.meetingDay in ['gold', 'maroon', 'both', 'general'] &&
+                                request.resource.data.sponsors is list &&
+                                request.resource.data.sponsors.size() > 0 &&
+                                request.resource.data.sponsors.size() <= 8 &&
+                                request.resource.data.updatedAt is timestamp &&
+                                request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if isClubHubAdmin();
+      }
+
       match /clubHubAccess/{emailKey} {
         allow read: if isAuthenticated() && (
           isClubHubAdmin() ||

@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   getClubsGroupedByMeetingDay,
+  getEffectiveMeetingDayForSlug,
+  isGoldDayClubSlug,
   isMaroonDayClubSlug,
   MAROON_DIRECTORY_ENTRIES,
+  setMeetingDayOverrides,
 } from "@/lib/club-hub/clubDirectorySections";
 import { requiresBoardForMaroonMeetingPick } from "@/lib/club-hub/meetingDayBoardAccess";
 import { BROAD_RUN_CLUBS, clubNameToSlug } from "@/lib/club-hub/broadRunClubDirectory";
@@ -70,5 +73,41 @@ describe("getClubsGroupedByMeetingDay", () => {
     const goldKey = gold.filter((c) => c.slug === "key-club");
     expect(goldKey).toHaveLength(1);
     expect(goldKey[0].name).toMatch(/\(Board only\)/i);
+  });
+});
+
+describe("admin meeting-day overrides", () => {
+  afterEach(() => setMeetingDayOverrides({}));
+
+  it("moves a General club to Gold", () => {
+    setMeetingDayOverrides({ "baking-club": "gold" });
+    const { general, gold, maroon } = getClubsGroupedByMeetingDay();
+    expect(gold.some((c) => c.slug === "baking-club")).toBe(true);
+    expect(general.some((c) => c.slug === "baking-club")).toBe(false);
+    expect(maroon.some((c) => c.slug === "baking-club")).toBe(false);
+    expect(isGoldDayClubSlug("baking-club")).toBe(true);
+  });
+
+  it("moves a Gold club to General", () => {
+    setMeetingDayOverrides({ "sports-talk": "general" });
+    const { general, gold } = getClubsGroupedByMeetingDay();
+    expect(gold.some((c) => c.slug === "sports-talk")).toBe(false);
+    expect(general.some((c) => c.slug === "sports-talk")).toBe(true);
+    expect(isGoldDayClubSlug("sports-talk")).toBe(false);
+  });
+
+  it("puts a club on both days and keeps default labels", () => {
+    setMeetingDayOverrides({ deca: "maroon", "sports-talk": "both" });
+    const { gold, maroon } = getClubsGroupedByMeetingDay();
+    expect(gold.some((c) => c.slug === "deca")).toBe(false);
+    expect(maroon.some((c) => c.slug === "deca")).toBe(true);
+    expect(gold.some((c) => c.slug === "sports-talk")).toBe(true);
+    expect(maroon.some((c) => c.slug === "sports-talk")).toBe(true);
+    expect(isMaroonDayClubSlug("sports-talk")).toBe(true);
+  });
+
+  it("ignores invalid override values", () => {
+    setMeetingDayOverrides({ "baking-club": "purple" });
+    expect(getEffectiveMeetingDayForSlug("baking-club")).toBe("general");
   });
 });

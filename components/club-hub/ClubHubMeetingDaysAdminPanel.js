@@ -58,8 +58,8 @@ export default function ClubHubMeetingDaysAdminPanel() {
     setError("");
     setMessage("");
     try {
-      await action();
-      setMessage(successText);
+      const extra = await action();
+      setMessage(`${successText}${extra || ""}`);
     } catch (err) {
       setError(err.message || "Could not update meeting day.");
     } finally {
@@ -68,19 +68,33 @@ export default function ClubHubMeetingDaysAdminPanel() {
   };
 
   const handleChange = (club, meetingDay) => {
-    if (meetingDay === club.meetingDay) return;
+    if (meetingDay === club.meetingDay || !user) return;
+    const fromLabel = MEETING_DAY_LABELS[club.meetingDay];
+    const toLabel = MEETING_DAY_LABELS[meetingDay];
+    const confirmed = window.confirm(
+      `Change ${club.name} from ${fromLabel} to ${toLabel}? Students who signed up for a day this club no longer meets will be removed from that signup and the Student meeting clubs sheet.`,
+    );
+    if (!confirmed) return;
     run(
       club.slug,
-      () =>
-        meetingDay === club.defaultMeetingDay && club.overridden
-          ? resetClubMeetingDay({ slug: club.slug, adminUid: user.uid })
-          : saveClubMeetingDay({
-              slug: club.slug,
-              clubName: club.name,
-              meetingDay,
-              adminUid: user.uid,
-            }),
-      `${club.name} is now ${MEETING_DAY_LABELS[meetingDay]}.`,
+      async () => {
+        const data =
+          meetingDay === club.defaultMeetingDay && club.overridden
+            ? await resetClubMeetingDay({ slug: club.slug, user })
+            : await saveClubMeetingDay({
+                slug: club.slug,
+                clubName: club.name,
+                meetingDay,
+                user,
+              });
+        const removed =
+          data.cleared > 0
+            ? ` Removed ${data.cleared} signup${data.cleared === 1 ? "" : "s"}.`
+            : "";
+        const warning = data.sheetWarning ? ` ${data.sheetWarning}` : "";
+        return `${removed}${warning}`;
+      },
+      `${club.name} is now ${toLabel}.`,
     );
   };
 
@@ -89,8 +103,8 @@ export default function ClubHubMeetingDaysAdminPanel() {
       <h2 className="text-lg font-bold text-neutral-900">Club meeting days</h2>
       <p className="mt-1 text-sm text-neutral-700">
         Choose whether each club meets on Gold days, Maroon days, both, or is a General club.
-        Changes update the club directory and which clubs students can pick on their meeting
-        days page.
+        Students signed up for a day the club no longer meets are removed from that signup and
+        from the Student meeting clubs sheet.
       </p>
 
       <ClubHubLiveMessage message={message} />
@@ -149,7 +163,11 @@ export default function ClubHubMeetingDaysAdminPanel() {
                   id={selectId}
                   value={club.meetingDay}
                   disabled={!user?.uid || Boolean(busySlug)}
-                  onChange={(e) => handleChange(club, e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    e.target.value = club.meetingDay;
+                    handleChange(club, next);
+                  }}
                   className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm disabled:opacity-50"
                 >
                   {Object.entries(MEETING_DAY_LABELS).map(([value, label]) => (

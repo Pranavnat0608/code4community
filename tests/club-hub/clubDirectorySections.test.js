@@ -4,6 +4,7 @@ import {
   getEffectiveMeetingDayForSlug,
   isGoldDayClubSlug,
   isMaroonDayClubSlug,
+  meetingChoicesAfterClubDayChange,
   MAROON_DIRECTORY_ENTRIES,
   setMeetingDayOverrides,
 } from "@/lib/club-hub/clubDirectorySections";
@@ -109,5 +110,45 @@ describe("admin meeting-day overrides", () => {
   it("ignores invalid override values", () => {
     setMeetingDayOverrides({ "baking-club": "purple" });
     expect(getEffectiveMeetingDayForSlug("baking-club")).toBe("general");
+  });
+});
+
+describe("meetingChoicesAfterClubDayChange", () => {
+  it("clears a maroon signup when the club no longer meets on maroon", () => {
+    expect(
+      meetingChoicesAfterClubDayChange(
+        { goldClubSlug: "sports-talk", maroonClubSlug: "baking-club" },
+        "baking-club",
+        "general",
+      ),
+    ).toEqual({
+      goldClubSlug: "sports-talk",
+      maroonClubSlug: "",
+      changed: true,
+    });
+  });
+
+  it("keeps the gold signup when the club stays on gold", () => {
+    expect(
+      meetingChoicesAfterClubDayChange(
+        { goldClubSlug: "sports-talk", maroonClubSlug: "" },
+        "sports-talk",
+        "gold",
+      ).changed,
+    ).toBe(false);
+  });
+
+  it("clears only the day a both-day club leaves", () => {
+    expect(
+      meetingChoicesAfterClubDayChange(
+        { goldClubSlug: "deca", maroonClubSlug: "deca" },
+        "deca",
+        "gold",
+      ),
+    ).toEqual({
+      goldClubSlug: "deca",
+      maroonClubSlug: "",
+      changed: true,
+    });
   });
 });

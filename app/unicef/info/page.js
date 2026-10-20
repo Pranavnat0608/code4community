@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { runEffectWork } from "@/hooks/runEffectWork";
 import { fetchUnicefAnnouncements, addUnicefAnnouncement, saveUnicefSettings } from "@/lib/unicef/api";
 import { useUnicefAccess } from "@/lib/unicef/useUnicefAccess";
 import { unicefButtonClass, unicefCardClass, unicefInputClass } from "@/components/unicef/ui";
@@ -15,7 +16,7 @@ export default function UnicefInfoPage() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setDraft(settings.infoHtml);
+    return runEffectWork(() => setDraft(settings.infoHtml));
   }, [settings.infoHtml]);
 
   useEffect(() => {

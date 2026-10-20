@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { runEffectWork } from "@/hooks/runEffectWork";
 import Link from "next/link";
 import {
   fetchAllUnicefSubmissions,
@@ -30,8 +31,10 @@ export default function UnicefAdminPage() {
   };
 
   useEffect(() => {
-    if (!officer) return;
-    load().catch((err) => setError(err.message || "Could not load admin data."));
+    if (!officer) return undefined;
+    return runEffectWork(() => {
+      load().catch((err) => setError(err.message || "Could not load admin data."));
+    });
   }, [officer]);
 
   if (authLoading) return <p className="text-sm text-slate-500">Loading…</p>;
@@ -142,5 +145,9 @@ function ProofImage({ submissionId }) {
     };
   }, [submissionId]);
   if (!src) return null;
-  return <img src={src} alt="" className="mt-2 max-h-48 rounded-md" />;
+  return (
+    // User-uploaded proof is a data URL, not a static asset.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt="" className="mt-2 max-h-48 rounded-md" />
+  );
 }

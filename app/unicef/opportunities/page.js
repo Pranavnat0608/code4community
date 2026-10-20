@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { runEffectWork } from "@/hooks/runEffectWork";
 import { addUnicefOpportunity, deleteUnicefOpportunity, fetchUnicefOpportunities } from "@/lib/unicef/api";
 import { useUnicefAccess } from "@/lib/unicef/useUnicefAccess";
 import { unicefButtonClass, unicefCardClass, unicefInputClass } from "@/components/unicef/ui";
@@ -16,7 +17,9 @@ export default function UnicefOpportunitiesPage() {
   const load = async () => setRows(await fetchUnicefOpportunities());
 
   useEffect(() => {
-    load().catch((err) => setError(err.message || "Could not load opportunities."));
+    return runEffectWork(() => {
+      load().catch((err) => setError(err.message || "Could not load opportunities."));
+    });
   }, []);
 
   const add = async (e) => {

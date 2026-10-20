@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { runEffectWork } from "@/hooks/runEffectWork";
 import { fetchClubPageInfo, saveClubPageInfo } from "@/lib/club-hub/clubPages";
 import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
 import {
@@ -46,8 +47,12 @@ export default function ClubHubJoinPolicyPanel({
   const [requests, setRequests] = useState([]);
   const onErrorRef = useRef(onError);
   const userRef = useRef(user);
-  onErrorRef.current = onError;
-  userRef.current = user;
+  useEffect(() => {
+    return runEffectWork(() => {
+      onErrorRef.current = onError;
+      userRef.current = user;
+    });
+  }, [onError, user]);
 
   const loadRequests = useCallback(async () => {
     const rows = await fetchPendingJoinRequestsForClub(userRef.current, clubSlug);

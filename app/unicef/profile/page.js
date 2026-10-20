@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { runEffectWork } from "@/hooks/runEffectWork";
 import { updateUnicefProfile } from "@/lib/unicef/api";
 import { accountName } from "@/lib/unicef/accountName";
 import { UNICEF_GRADES } from "@/lib/unicef/hours";
@@ -19,9 +20,11 @@ export default function UnicefProfilePage() {
   const name = accountName(user, userData);
 
   useEffect(() => {
-    if (!profile) return;
-    setGrade(profile.grade || "Freshman");
-    setPhone(profile.phone || "");
+    if (!profile) return undefined;
+    return runEffectWork(() => {
+      setGrade(profile.grade || "Freshman");
+      setPhone(profile.phone || "");
+    });
   }, [profile]);
 
   if (authLoading) return <p className="text-sm text-slate-500">Loading…</p>;

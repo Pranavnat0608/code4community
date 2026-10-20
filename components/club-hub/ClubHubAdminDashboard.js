@@ -8,6 +8,7 @@ import ClubHubAdminStudentsPanel from "@/components/club-hub/ClubHubAdminStudent
 import ClubHubRostersPanel from "@/components/club-hub/ClubHubRostersPanel";
 import ClubHubOpportunityEventsPanel from "@/components/club-hub/ClubHubOpportunityEventsPanel";
 import ClubHubSpecialSheetEventsPanel from "@/components/club-hub/ClubHubSpecialSheetEventsPanel";
+import ClubHubMeetingDaysAdminPanel from "@/components/club-hub/ClubHubMeetingDaysAdminPanel";
 import { getSortedClubOptions } from "@/lib/club-hub/broadRunClubDirectory";
 import {
   PROTECTED_CLUB_HUB_COORDINATOR_EMAIL,
@@ -125,7 +126,7 @@ export default function ClubHubAdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-neutral-900">Club Hub admin</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-700">
-          Manage coordinators and per-club rosters. Seminar columns are on the Student meeting clubs sheet.
+          Manage coordinators, per-club rosters, and Gold / Maroon / General meeting days. Seminar columns are on the Student meeting clubs sheet.
         </p>
         <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Club Hub admin sections">
           <button
@@ -149,6 +150,17 @@ export default function ClubHubAdminDashboard() {
             className={tabBtn(tab === "rosters")}
           >
             Rosters &amp; metrics
+          </button>
+          <button
+            type="button"
+            role="tab"
+            id="club-hub-tab-meeting-days"
+            aria-selected={tab === "meeting-days"}
+            aria-controls="club-hub-panel-meeting-days"
+            onClick={() => setTab("meeting-days")}
+            className={tabBtn(tab === "meeting-days")}
+          >
+            Meeting days
           </button>
           <button
             type="button"
@@ -208,6 +220,17 @@ export default function ClubHubAdminDashboard() {
           tabIndex={0}
         >
           <ClubHubSpecialSheetEventsPanel />
+        </div>
+      ) : null}
+
+      {tab === "meeting-days" ? (
+        <div
+          id="club-hub-panel-meeting-days"
+          role="tabpanel"
+          aria-labelledby="club-hub-tab-meeting-days"
+          tabIndex={0}
+        >
+          <ClubHubMeetingDaysAdminPanel />
         </div>
       ) : null}
 

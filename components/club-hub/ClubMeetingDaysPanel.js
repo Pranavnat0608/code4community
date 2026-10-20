@@ -15,6 +15,7 @@ import {
 } from "@/lib/club-hub/clubMeetingChoices";
 import { notifyMeetingChoicesSheetSync } from "@/lib/club-hub/notifyMeetingChoicesSheetSync";
 import { fetchMembershipsForUser } from "@/lib/club-hub/clubMemberships";
+import { loadMeetingDayOverrides } from "@/lib/club-hub/clubMeetingDays";
 import ClubHubSelectField from "@/components/club-hub/ClubHubSelectField";
 import { clubHubButtonFocusClass } from "@/lib/club-hub/a11y";
 import { CLUB_HUB_MAROON } from "@/lib/club-hub/theme";
@@ -93,6 +94,7 @@ export default function ClubMeetingDaysPanel() {
         const [rows, choices] = await Promise.all([
           fetchMembershipsForUser(uid),
           fetchMeetingChoices(uid),
+          loadMeetingDayOverrides(),
         ]);
         if (cancelled) return;
         setMemberships(rows);

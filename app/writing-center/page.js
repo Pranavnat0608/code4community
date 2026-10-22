@@ -3,6 +3,7 @@
 import { useAuth } from "@/utils/AuthContext";
 import { resolveWritingCenterViewRole } from "@/lib/profile";
 import { AppPageLayout } from "@/components/common/AppPageLayout";
+import WritingCenterPageShell from "@/components/writing-center/WritingCenterPageShell";
 import StudentDashboard from "@/components/writing-center/StudentDashboard";
 import TutorDashboard from "@/components/writing-center/TutorDashboard";
 import AdminDashboard from "@/components/writing-center/AdminDashboard";
@@ -69,7 +70,7 @@ export default function WritingCenterPage() {
   const isAdminView = userRole === "ADMIN";
 
   return (
-    <AppPageLayout>
+    <WritingCenterPageShell>
       {userRole === "STUDENT" && <StudentDashboard />}
       {userRole === "TUTOR" && <TutorDashboard />}
       {userRole === "TEACHER" && <TeacherDashboard />}
@@ -79,6 +80,6 @@ export default function WritingCenterPage() {
           <p>Unknown role: {userRole}. Ask an admin to set your Writing Center role in Firestore.</p>
         </div>
       )}
-    </AppPageLayout>
+    </WritingCenterPageShell>
   );
 }

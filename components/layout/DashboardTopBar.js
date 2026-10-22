@@ -58,7 +58,8 @@ export default function DashboardTopBar({ title = "Code4Community", onNavigation
   const isToolShell =
     pathname?.startsWith("/mathlab") ||
     pathname?.startsWith("/office-hours") ||
-    pathname?.startsWith("/library-pass");
+    pathname?.startsWith("/library-pass") ||
+    pathname?.startsWith("/writing-center");
   const headerSticky = isToolShell
     ? "sticky top-0 z-50 bg-background shadow-sm"
     : pathname === "/" || pathname === "/services" || pathname === "/work"

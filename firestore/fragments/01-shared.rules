@@ -25,7 +25,7 @@
       }
 
       function clubHubStudentModeSelfOnly() {
-        return emailsMatch('1021676@lcps.org', request.auth.token.email);
+        return normalizeEmail(request.auth.token.email) in ['1021676@lcps.org', '1074443@lcps.org'];
       }
 
       function clubHubStudentModeFieldOk() {

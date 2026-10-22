@@ -31,7 +31,7 @@
       }
 
       function clubHubStudentModeSelfOnly() {
-        return emailsMatch('1021676@lcps.org', request.auth.token.email);
+        return normalizeEmail(request.auth.token.email) in ['1021676@lcps.org', '1074443@lcps.org'];
       }
 
       function clubHubStudentModeFieldOk() {
@@ -698,6 +698,58 @@
         return s in ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
       }
 
+      function isWritingCenterTutorRole() {
+        return isAuthenticated() &&
+              (
+                writingCenterRoleField() == 'tutor' ||
+                writingCenterUserRole() in ['tutor', 'TUTOR']
+              );
+      }
+
+      function isHallPassArrivalUpdate() {
+        return isWritingCenterTutorRole() &&
+              resource.data.sessionType == 'IN_PERSON' &&
+              resource.data.status in ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] &&
+              resource.data.hallPassStartedAt is timestamp &&
+              !(resource.data.get('hallPassInAt', null) is timestamp) &&
+              request.resource.data.hallPassInAt is timestamp &&
+              request.resource.data.status == resource.data.status &&
+              request.resource.data.studentId == resource.data.studentId &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'hallPassInAt', 'updatedAt'
+              ]);
+      }
+
+      function isHallPassDepartureUpdate() {
+        return isWritingCenterTutorRole() &&
+              resource.data.sessionType == 'IN_PERSON' &&
+              resource.data.status in ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] &&
+              resource.data.hallPassInAt is timestamp &&
+              !(resource.data.get('hallPassLeftAt', null) is timestamp) &&
+              request.resource.data.hallPassLeftAt is timestamp &&
+              request.resource.data.status == resource.data.status &&
+              request.resource.data.hallPassInAt == resource.data.hallPassInAt &&
+              request.resource.data.studentId == resource.data.studentId &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'hallPassLeftAt', 'updatedAt'
+              ]);
+      }
+
+      function isStudentHallPassEnd() {
+        return resource.data.studentId == request.auth.uid &&
+              request.resource.data.studentId == resource.data.studentId &&
+              resource.data.sessionType == 'IN_PERSON' &&
+              resource.data.hallPassLeftAt is timestamp &&
+              !(resource.data.get('hallPassEndedAt', null) is timestamp) &&
+              request.resource.data.hallPassEndedAt is timestamp &&
+              request.resource.data.status == 'COMPLETED' &&
+              request.resource.data.hallPassLeftAt == resource.data.hallPassLeftAt &&
+              request.resource.data.hallPassInAt == resource.data.hallPassInAt &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'hallPassEndedAt', 'status', 'updatedAt'
+              ]);
+      }
+
       function isWritingCenterTutor() {
         return isAuthenticated() &&
               exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
@@ -740,7 +792,14 @@
 
         allow update: if isAuthenticated() && (
                           (resource.data.studentId == request.auth.uid &&
-                            request.resource.data.studentId == resource.data.studentId) ||
+                            request.resource.data.studentId == resource.data.studentId &&
+                            request.resource.data.get('hallPassInAt', null) == resource.data.get('hallPassInAt', null) &&
+                            request.resource.data.get('hallPassLeftAt', null) == resource.data.get('hallPassLeftAt', null) &&
+                            request.resource.data.get('hallPassEndedAt', null) == resource.data.get('hallPassEndedAt', null) &&
+                            !(request.resource.data.status == 'COMPLETED' && resource.data.status != 'COMPLETED')) ||
+                          isStudentHallPassEnd() ||
+                          isHallPassArrivalUpdate() ||
+                          isHallPassDepartureUpdate() ||
                           (resource.data.tutorId == request.auth.uid &&
                             request.resource.data.tutorId == resource.data.tutorId &&
                             resource.data.sessionType != 'MINI_LESSON') ||

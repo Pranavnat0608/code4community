@@ -23,6 +23,9 @@ import { assertClientRateLimit } from "@/utils/clientRateLimit";
 import { WritingCenterCache } from "@/utils/cache";
 import { hydrateLiveList } from "@/utils/liveFirestoreCache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
+import { ActivePassesBoard } from "./ActivePassesBoard";
+import { isOpenHallPass, markWritingCenterPassIn, markWritingCenterPassOut } from "@/lib/writing-center/hallPass";
+import { sortSessionsNewestFirst } from "@/lib/firestoreDates";
 
 export default function TutorDashboard({ preview = false, asUser = null }) {
   const liveSessions = useWritingCenterLiveSessions(!!firestore);
@@ -36,6 +39,8 @@ export default function TutorDashboard({ preview = false, asUser = null }) {
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSession, setActiveSession] = useState(null);
+  const [markingPassId, setMarkingPassId] = useState("");
+  const [markError, setMarkError] = useState("");
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const { user: authUser } = useAuth();
@@ -238,11 +243,33 @@ export default function TutorDashboard({ preview = false, asUser = null }) {
     }
   };
 
+  const activePasses = useMemo(
+    () => sortSessionsNewestFirst(liveSessions.filter((session) => isOpenHallPass(session))),
+    [liveSessions],
+  );
+
+  const handleMarkPass = async (pass, action) => {
+    if (preview || !pass?.id || markingPassId) return;
+    setMarkingPassId(`${pass.id}:${action}`);
+    setMarkError("");
+    try {
+      assertClientRateLimit("sessionUpdate", user?.uid);
+      if (action === "out") await markWritingCenterPassOut(pass.id);
+      else await markWritingCenterPassIn(pass.id);
+      invalidateOnDataChange("writing_center_sessions", user?.uid || "hall-pass");
+    } catch (err) {
+      setMarkError(err.message || "Could not update this pass.");
+    } finally {
+      setMarkingPassId("");
+    }
+  };
+
   const availableSessions = sessions.filter(
-    (s) => s.status === "PENDING" || s.status === "ACCEPTED",
+    (s) => (s.status === "PENDING" || s.status === "ACCEPTED") && !isOpenHallPass(s),
   );
   const mySessions = sessions.filter(
     (s) =>
+      !isOpenHallPass(s) &&
       (s.tutorId === user?.uid || miniLessonIncludesTutor(s, user?.uid)) &&
       (s.status === "ACCEPTED" || s.status === "COMPLETED" || s.status === "IN_PROGRESS"),
   );
@@ -336,7 +363,7 @@ export default function TutorDashboard({ preview = false, asUser = null }) {
         <h1 className="text-2xl font-bold text-gray-900">Writing Center - Tutor Dashboard</h1>
         <nav className="mt-3 flex flex-wrap gap-1" aria-label="Tutor sections">
           <button type="button" onClick={() => setActiveTab("available")} className={tabClass("available")}>
-            Available Requests ({availableSessions.length})
+            Available Requests ({activePasses.length + availableSessions.length})
           </button>
           <button type="button" onClick={() => setActiveTab("my-sessions")} className={tabClass("my-sessions")}>
             My Sessions ({mySessions.length})
@@ -346,6 +373,42 @@ export default function TutorDashboard({ preview = false, asUser = null }) {
 
       {activeTab === "available" ? (
         <div className="w-full">
+          {activePasses.length > 0 && (
+            <div className="mb-6">
+              {markError ? <p className="mb-3 text-sm text-red-600">{markError}</p> : null}
+              <ActivePassesBoard
+                passes={activePasses}
+                allSessions={sessions}
+                onMarkIn={preview ? undefined : (pass) => handleMarkPass(pass, "in")}
+                onMarkOut={preview ? undefined : (pass) => handleMarkPass(pass, "out")}
+                onAccept={
+                  preview
+                    ? undefined
+                    : async (pass) => {
+                        if (!pass?.id || markingPassId) return;
+                        setMarkingPassId(`${pass.id}:accept`);
+                        setMarkError("");
+                        try {
+                          assertClientRateLimit("sessionUpdate", user?.uid);
+                          await updateDoc(doc(firestore, "sessions", pass.id), {
+                            tutorId: user.uid,
+                            tutorName: user.displayName || user.email,
+                            tutorEmail: user.email,
+                            status: "ACCEPTED",
+                            updatedAt: serverTimestamp(),
+                          });
+                          invalidateOnDataChange("writing_center_sessions", user.uid);
+                        } catch (err) {
+                          setMarkError(err.message || "Failed to accept session");
+                        } finally {
+                          setMarkingPassId("");
+                        }
+                      }
+                }
+                markingId={markingPassId}
+              />
+            </div>
+          )}
           {activeSession && !preview && activeSession.sessionType !== "ASYNC" && (
             <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 mb-6 w-full">
               <div className="flex items-center justify-between">
@@ -366,21 +429,23 @@ export default function TutorDashboard({ preview = false, asUser = null }) {
               </div>
             </div>
           )}
-          <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden w-full">
-            <SessionRequestList
-              sessions={availableSessions}
-              emptyMessage="No available requests at the moment."
-              showTutor
-              showActions
-              renderActions={renderActions}
-            />
-          </div>
+          {availableSessions.length > 0 && (
+            <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden w-full">
+              <SessionRequestList
+                sessions={availableSessions}
+                emptyMessage="No available requests at the moment."
+                showTutor
+                showActions
+                renderActions={renderActions}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden w-full">
           <SessionRequestList
             sessions={mySessions}
-            emptyMessage="No sessions yet."
+            emptyMessage="No finished sessions yet. Reports and receipts show up here."
             showTutor
             showActions
             renderActions={renderActions}

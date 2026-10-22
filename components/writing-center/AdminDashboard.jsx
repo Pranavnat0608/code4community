@@ -44,6 +44,8 @@ import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
 import { resolveDisplayName, resolveWritingCenterViewRole } from "@/lib/profile";
 import { hasWritingCenterTutorAccess } from "@/lib/tutorServices";
 import { WritingCenterAdminTeamPanel } from "./WritingCenterAdminTeamPanel";
+import { ActivePassesBoard } from "./ActivePassesBoard";
+import { isOpenHallPass, markWritingCenterPassIn, markWritingCenterPassOut } from "@/lib/writing-center/hallPass";
 
 function simulateRoleLabel(viewRole) {
   if (viewRole === "TUTOR") return "tutor";
@@ -75,6 +77,8 @@ export default function AdminDashboard() {
   const [miniLessonSaving, setMiniLessonSaving] = useState(false);
   const [simulateUser, setSimulateUser] = useState(null);
   const [simulateSearch, setSimulateSearch] = useState("");
+  const [markingPassId, setMarkingPassId] = useState("");
+  const [markError, setMarkError] = useState("");
   const { user } = useAuth();
 
   const sessions = useMemo(
@@ -246,6 +250,27 @@ export default function AdminDashboard() {
     }
   };
 
+  const activePasses = useMemo(
+    () => sortSessionsNewestFirst(liveSessions.filter((session) => isOpenHallPass(session))),
+    [liveSessions],
+  );
+
+  const handleMarkPass = async (pass, action) => {
+    if (!pass?.id || markingPassId) return;
+    setMarkingPassId(`${pass.id}:${action}`);
+    setMarkError("");
+    try {
+      assertClientRateLimit("sessionUpdate", user?.uid);
+      if (action === "out") await markWritingCenterPassOut(pass.id);
+      else await markWritingCenterPassIn(pass.id);
+      invalidateOnDataChange("writing_center_sessions", "hall-pass");
+    } catch (err) {
+      setMarkError(err.message || "Could not update this pass.");
+    } finally {
+      setMarkingPassId("");
+    }
+  };
+
   const filteredSessions = sortSessionsNewestFirst(
     sessions.filter((session) => {
       if (isMiniLessonSession(session)) return false;
@@ -330,7 +355,10 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-bold text-gray-900">Writing Center - Admin Dashboard</h1>
           <nav className="mt-3 flex flex-wrap gap-1" aria-label="Admin sections">
             <button type="button" onClick={() => setActiveTab("sessions")} className={tabClass("sessions")}>
-              Sessions
+              Active passes
+            </button>
+            <button type="button" onClick={() => setActiveTab("history")} className={tabClass("history")}>
+              History
             </button>
             <button
               type="button"
@@ -369,7 +397,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {activeTab === "sessions" && (
+        {activeTab === "history" && (
           <div className="flex shrink-0 flex-wrap items-center gap-2 lg:ml-auto lg:justify-end">
             <select
               value={statusFilter}
@@ -450,6 +478,17 @@ export default function AdminDashboard() {
       {activeTab === "team" ? (
         <WritingCenterAdminTeamPanel />
       ) : activeTab === "sessions" ? (
+        <div className="w-full">
+          {markError ? <p className="mb-3 text-sm text-red-600">{markError}</p> : null}
+          <ActivePassesBoard
+            passes={activePasses}
+            allSessions={sessions}
+            onMarkIn={(pass) => handleMarkPass(pass, "in")}
+            onMarkOut={(pass) => handleMarkPass(pass, "out")}
+            markingId={markingPassId}
+          />
+        </div>
+      ) : activeTab === "history" ? (
         <div className="w-full">
           <div className="bg-white shadow rounded-lg mb-6 overflow-hidden w-full">
             <div className="flex flex-col sm:flex-row sm:divide-x divide-gray-200">

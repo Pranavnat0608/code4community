@@ -1,12 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useRunEffect } from "@/hooks/useRunEffect";
 import { useAuth } from "@/utils/AuthContext";
+import { resolveDisplayName } from "@/lib/profile";
+import { firestoreToDate, sortSessionsNewestFirst } from "@/lib/firestoreDates";
 import { firestore } from "@/firebase";
 import {
   updateDoc,
   doc,
+  getDoc,
   addDoc,
   collection,
   serverTimestamp,
@@ -28,17 +31,24 @@ import { assertClientRateLimit } from "@/utils/clientRateLimit";
 import { WritingCenterCache } from "@/utils/cache";
 import { hydrateLiveList, mapSnapshotDocs } from "@/utils/liveFirestoreCache";
 import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
+import { WritingCenterRequestChooser } from "./WritingCenterRequestChooser";
+import { WritingCenterPassCard } from "./WritingCenterPassCard";
+import { endWritingCenterPass } from "@/lib/writing-center/hallPass";
 
-export default function StudentDashboard({ preview = false, asUser = null }) {
+export default function StudentDashboard({ preview = false, asUser = null, mode = "home" }) {
   const [liveSessions, setLiveSessions] = useState([]);
   const [pastSessions, setPastSessions] = useState([]);
   const [receiptShares, setReceiptShares] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [sessionType, setSessionType] = useState("IN_PERSON");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user: authUser } = useAuth();
+  const [startingPass, setStartingPass] = useState(false);
+  const [endingPass, setEndingPass] = useState(false);
+  const [localPassStart, setLocalPassStart] = useState(null);
+  const [localPassEnd, setLocalPassEnd] = useState(null);
+  const [keptEndedPass, setKeptEndedPass] = useState(null);
+  const closedPassIds = useRef(new Set());
+  const openPassRef = useRef(null);
+  const { user: authUser, userData } = useAuth();
   const asUserId = asUser?.uid || asUser?.id || null;
   const user = useMemo(() => {
     if (!asUserId) return authUser;
@@ -102,7 +112,47 @@ export default function StudentDashboard({ preview = false, asUser = null }) {
       () => liveStudentWritingCenterSessionsQuery(firestore, user.uid),
       (snapshot) => {
         const data = mapSnapshotDocs(snapshot);
-        setLiveSessions(data);
+        const stillOpen = [];
+        const endedPasses = [];
+        for (const session of data) {
+          if (session.sessionType === "IN_PERSON" && session.hallPassEndedAt) {
+            endedPasses.push({ ...session, status: "COMPLETED" });
+          } else {
+            stillOpen.push(session);
+          }
+        }
+        setLiveSessions(stillOpen);
+        const watched = openPassRef.current;
+        if (watched && !data.some((session) => session.id === watched.id)) {
+          openPassRef.current = null;
+          getDoc(doc(firestore, "sessions", watched.id))
+            .then((snap) => {
+              const row = snap.data();
+              const arrived = firestoreToDate(row?.hallPassInAt) || firestoreToDate(row?.hallPassEndedAt);
+              if (row?.status === "COMPLETED" && arrived) {
+                setKeptEndedPass({
+                  id: watched.id,
+                  studentName: watched.studentName,
+                  startedAt: watched.startedAt,
+                  endedAt: arrived,
+                });
+              }
+            })
+            .catch(() => {});
+        }
+        if (endedPasses.length) {
+          setPastSessions((prev) => mergeWritingCenterSessions(endedPasses, prev));
+          for (const session of endedPasses) {
+            if (closedPassIds.current.has(session.id)) continue;
+            closedPassIds.current.add(session.id);
+            updateDoc(doc(firestore, "sessions", session.id), {
+              status: "COMPLETED",
+              updatedAt: serverTimestamp(),
+            }).catch(() => {
+              closedPassIds.current.delete(session.id);
+            });
+          }
+        }
       },
     );
   }, [user?.uid, loadPastSessions, loadReceiptShares]);
@@ -113,7 +163,71 @@ export default function StudentDashboard({ preview = false, asUser = null }) {
   }, [sessions, user?.uid, preview]);
 
   const studentDisplayName =
-    user?.displayName || user?.email?.split("@")[0] || "Student";
+    resolveDisplayName(userData, "") ||
+    user?.displayName ||
+    user?.email?.split("@")[0] ||
+    "Student";
+
+  const activePass = useMemo(() => {
+    const live = liveSessions.filter(
+      (session) =>
+        session.sessionType === "IN_PERSON" &&
+        WC_LIVE_STATUSES.includes(session.status) &&
+        !session.hallPassEndedAt,
+    );
+    return sortSessionsNewestFirst(live)[0] || null;
+  }, [liveSessions]);
+
+  const passStartedAt = activePass
+    ? firestoreToDate(activePass.hallPassStartedAt) ||
+      (localPassStart?.id === activePass.id ? localPassStart.at : null)
+    : null;
+  const passEndedAt = activePass
+    ? firestoreToDate(activePass.hallPassEndedAt) ||
+      (localPassEnd?.id === activePass.id ? localPassEnd.at : null)
+    : null;
+  const passIsOpen = Boolean(activePass) && !passEndedAt;
+  const passMarkedOut = Boolean(activePass && firestoreToDate(activePass.hallPassLeftAt));
+
+  const handleEndPass = async () => {
+    if (!activePass || endingPass || preview || !passMarkedOut || passEndedAt) return;
+    const ended = new Date();
+    const pass = activePass;
+    setEndingPass(true);
+    setError("");
+    try {
+      assertClientRateLimit("sessionUpdate", user?.uid);
+      closedPassIds.current.add(pass.id);
+      setKeptEndedPass({
+        id: pass.id,
+        studentName: pass.studentName,
+        startedAt: passStartedAt,
+        endedAt: ended,
+      });
+      setLiveSessions((prev) => prev.filter((session) => session.id !== pass.id));
+      setPastSessions((prev) =>
+        mergeWritingCenterSessions([{ ...pass, status: "COMPLETED", hallPassEndedAt: ended }], prev),
+      );
+      await endWritingCenterPass(pass.id);
+      await loadPastSessions();
+    } catch (err) {
+      closedPassIds.current.delete(pass.id);
+      setKeptEndedPass(null);
+      setLiveSessions((prev) => mergeWritingCenterSessions([pass], prev));
+      setError(err.message || "Could not end the pass.");
+    } finally {
+      setEndingPass(false);
+    }
+  };
+
+  useRunEffect(() => {
+    if (!activePass || !passStartedAt || keptEndedPass) return;
+    openPassRef.current = {
+      id: activePass.id,
+      studentName: activePass.studentName,
+      startedAt: passStartedAt,
+    };
+  }, [activePass, passStartedAt, keptEndedPass]);
 
   const openAsyncForm = () => {
     const url = buildAsyncFormUrl({
@@ -121,20 +235,20 @@ export default function StudentDashboard({ preview = false, asUser = null }) {
       name: studentDisplayName,
     });
     window.open(url, "_blank", "noopener,noreferrer");
-    setShowModal(false);
-    setSessionType("IN_PERSON");
     setError("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (isSubmitting || !user) return;
+  const handleChoose = async (sessionType) => {
+    if (isSubmitting || !user || preview) return;
     if (sessionType === "ASYNC") {
       openAsyncForm();
       return;
     }
+    if (passIsOpen) {
+      setError("You already have an in-person pass.");
+      return;
+    }
 
-    setLoading(true);
     setIsSubmitting(true);
     setError("");
 
@@ -151,13 +265,10 @@ export default function StudentDashboard({ preview = false, asUser = null }) {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      setShowModal(false);
-      setSessionType("IN_PERSON");
       invalidateOnDataChange("writing_center_sessions", user.uid);
     } catch (err) {
-      setError(err.message || "Failed to submit request");
+      setError(err.message || "Failed to create pass");
     } finally {
-      setLoading(false);
       setIsSubmitting(false);
     }
   };
@@ -182,136 +293,128 @@ export default function StudentDashboard({ preview = false, asUser = null }) {
     }
   };
 
+  const handleStartPass = async () => {
+    if (!activePass || startingPass || preview || firestoreToDate(activePass.hallPassStartedAt)) return;
+    const started = new Date();
+    setLocalPassStart({ id: activePass.id, at: started });
+    setStartingPass(true);
+    setError("");
+    try {
+      assertClientRateLimit("sessionUpdate", user?.uid);
+      await updateDoc(doc(firestore, "sessions", activePass.id), {
+        hallPassStartedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      setLocalPassStart(null);
+      setError(err.message || "Could not start the pass.");
+    } finally {
+      setStartingPass(false);
+    }
+  };
+
+  const sessionList = (
+    <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden w-full">
+      <SessionRequestList
+        sessions={sessions}
+        emptyMessage="No sessions yet."
+        showStudent={false}
+        showActions
+        renderActions={(session) => {
+          if (session.status === "PENDING" && !preview) {
+            return (
+              <button
+                type="button"
+                onClick={() => handleCancel(session.id)}
+                className="text-red-600 hover:text-red-800 text-sm font-medium"
+              >
+                Cancel
+              </button>
+            );
+          }
+          if (session.status === "COMPLETED" && getSessionReportUrl(session)) {
+            return (
+              <div className="flex flex-col items-end gap-1">
+                <SessionReportLink session={session} />
+                {!preview && (
+                  <SendReceiptToTeacherButton
+                    session={session}
+                    alreadySentTeacherIds={sharesBySession[session.id] || []}
+                    onSent={() => loadReceiptShares()}
+                  />
+                )}
+              </div>
+            );
+          }
+          return null;
+        }}
+      />
+    </div>
+  );
+
+  if (mode === "history") {
+    return (
+      <div className={`w-full ${preview ? "" : "px-3 sm:px-4 lg:px-6 py-4"}`}>
+        <header className="w-full mb-6 border-b border-gray-200 pb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Session History</h1>
+          <p className="text-sm text-gray-600 mt-1">Your Writing Center requests.</p>
+        </header>
+        {sessionList}
+      </div>
+    );
+  }
+
+  const showingPass = Boolean(activePass || keptEndedPass);
+
   return (
-    <div className={`w-full ${preview ? "" : "px-3 sm:px-4 lg:px-6 py-4"}`}>
+    <div className={`flex w-full flex-col ${showingPass && !preview ? "min-h-0 flex-1" : ""} ${preview ? "" : "px-3 sm:px-4 lg:px-6 py-4"}`}>
+      {!showingPass && (
       <header className="w-full mb-6 border-b border-gray-200 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Writing Center</h1>
           <p className="text-sm text-gray-600 mt-1">
-            {sessions.length === 0
-              ? "Request help from a writing tutor."
-              : `${sessions.length} request${sessions.length === 1 ? "" : "s"}`}
+            {activePass && (firestoreToDate(activePass.hallPassStartedAt) || localPassStart?.id === activePass.id)
+              ? "Show this pass on the way to the Writing Center."
+              : activePass
+                ? "Press Start when you leave for the Writing Center."
+                : "Choose in person for a pass, or async to open the Google Form."}
           </p>
         </div>
-        {!preview && (
-          <button
-            type="button"
-            onClick={() => setShowModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700"
-          >
-            Request Help
-          </button>
-        )}
       </header>
+      )}
 
-      <div className="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden w-full">
-        <SessionRequestList
-          sessions={sessions}
-          emptyMessage='No sessions yet. Click "Request Help" to get started.'
-          showStudent={false}
-          showActions
-          renderActions={(session) => {
-            if (session.status === "PENDING" && !preview) {
-              return (
-                <button
-                  type="button"
-                  onClick={() => handleCancel(session.id)}
-                  className="text-red-600 hover:text-red-800 text-sm font-medium"
-                >
-                  Cancel
-                </button>
-              );
-            }
-            if (session.status === "COMPLETED" && getSessionReportUrl(session)) {
-              return (
-                <div className="flex flex-col items-end gap-1">
-                  <SessionReportLink session={session} />
-                  {!preview && (
-                    <SendReceiptToTeacherButton
-                      session={session}
-                      alreadySentTeacherIds={sharesBySession[session.id] || []}
-                      onSent={() => loadReceiptShares()}
-                    />
-                  )}
-                </div>
-              );
-            }
-            return null;
-          }}
-        />
-      </div>
+      {showingPass && (
+        <div className={preview ? "mb-6 flex justify-center" : "flex h-[calc(100dvh-10.5rem)] w-full items-center justify-center pb-14 md:h-[calc(100dvh-5.5rem)]"}>
+          {keptEndedPass ? (
+            <WritingCenterPassCard
+              studentName={keptEndedPass.studentName || studentDisplayName}
+              startedAt={keptEndedPass.startedAt}
+              endedAt={keptEndedPass.endedAt}
+            />
+          ) : (
+            <WritingCenterPassCard
+              studentName={activePass.studentName || studentDisplayName}
+              startedAt={passStartedAt}
+              endedAt={passEndedAt}
+              inRoom={Boolean(activePass.hallPassInAt) && !passMarkedOut}
+              markedOut={passMarkedOut}
+              onStart={preview ? undefined : handleStartPass}
+              onStop={preview || !passMarkedOut ? undefined : handleEndPass}
+              stopping={endingPass}
+              onCancel={preview ? undefined : () => handleCancel(activePass.id)}
+              starting={startingPass}
+            />
+          )}
+        </div>
+      )}
 
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <form onSubmit={handleSubmit} className="px-4 py-5 sm:p-6 space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">Request writing help</h3>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Session Type</label>
-                <div className="mt-2 flex space-x-4">
-                  <label className="flex items-center text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      value="IN_PERSON"
-                      checked={sessionType === "IN_PERSON"}
-                      onChange={(e) => setSessionType(e.target.value)}
-                      className="mr-2"
-                    />
-                    In-Person
-                  </label>
-                  <label className="flex items-center text-sm text-gray-700">
-                    <input
-                      type="radio"
-                      value="ASYNC"
-                      checked={sessionType === "ASYNC"}
-                      onChange={(e) => setSessionType(e.target.value)}
-                      className="mr-2"
-                    />
-                    Async (Google Form)
-                  </label>
-                </div>
-              </div>
-              {sessionType === "IN_PERSON" ? (
-                <p className="text-sm text-gray-600">
-                  Submit to join the in-person queue. A tutor will accept your request when
-                  available.
-                </p>
-              ) : (
-                <p className="text-sm text-gray-600">
-                  You&apos;ll open a Google Form to submit an async writing request. After you
-                  submit, your request will appear below for tutors—usually within a minute.
-                </p>
-              )}
-              {error && (
-                <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              )}
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    setError("");
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || isSubmitting}
-                  className="px-4 py-2 border border-transparent rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-sm"
-                >
-                  {loading
-                    ? "Please wait…"
-                    : sessionType === "ASYNC"
-                      ? "Open Google Form"
-                      : "Submit Request"}
-                </button>
-              </div>
-            </form>
-          </div>
+      {!preview && !showingPass && (
+        <div className="mb-6">
+          <WritingCenterRequestChooser
+            busy={isSubmitting}
+            error={error}
+            onSubmit={handleChoose}
+          />
         </div>
       )}
     </div>

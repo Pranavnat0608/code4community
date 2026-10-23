@@ -2,11 +2,12 @@
 import { useState, useEffect, useLayoutEffect } from "react";
 import { AppPageLayout } from "@/components/common/AppPageLayout";
 
+// LCPS secondary weighting; Synergy's chart view doesn't copy as text, so this is usually what applies.
 const DEFAULT_WEIGHTS = {
-  "Major Summative": 50,
-  "Minor Summative": 30,
-  "Graded Formative": 20,
-  "Formative Assessment": 20,
+  "Major Summative": 80,
+  "Minor Summative": 10,
+  "Graded Formative": 10,
+  "Formative Assessment": 10,
   "Extra Credit": 0,
   "Other": 0
 };
@@ -120,6 +121,7 @@ export default function GradeCalculator() {
       if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(t)) return false;
       if (isSynergyCategoryHeaderLine(t)) return false;
       if (isSynergyScoreMetadataLine(t)) return false;
+      if (/\d\s+out\s+of\s+\d/i.test(t)) return false;
       return true;
     };
 
@@ -251,7 +253,8 @@ export default function GradeCalculator() {
             }
             
             // Skip navigation items
-            if (navigationItems.some(item => nextLine.includes(item))) {
+            // Exact match only: titles like "Homework Unit 2" contain nav words such as "Home"
+            if (navigationItems.includes(nextLine.replace(/^(gs\s+)?icon\s+/i, ""))) {
               j++;
               continue;
             }
@@ -300,6 +303,14 @@ export default function GradeCalculator() {
             }
             
             // Extract score - try multiple formats (keep trying even after name/category found)
+            // "Raw Score	X.XX/Y.YYY" is the points value that counts toward the grade. It can differ from the
+            // displayed "X out of Y" (e.g. "39 out of 40" worth 9.75/10), so it overrides any earlier match.
+            const rawScoreMatch = nextLine.match(/(?:Raw\s+Score|Percentage)\s+(\d+\.?\d*)\/(\d+\.?\d*)/i);
+            if (rawScoreMatch) {
+              earned = parseFloat(rawScoreMatch[1]);
+              possible = parseFloat(rawScoreMatch[2]);
+              foundScore = true;
+            }
             if (!foundScore) {
               // Format 1: "X out of Y" - example: "105 out of 100.0000"
               const outOfMatch = nextLine.match(/(\d+\.?\d*)\s+out\s+of\s+(\d+\.?\d*)/i);
@@ -308,17 +319,7 @@ export default function GradeCalculator() {
                 possible = parseFloat(outOfMatch[2]);
                 foundScore = true;
               }
-              
-              // Format 2: "Raw Score	X.XX/Y.YYY"
-              if (!foundScore) {
-                const rawScoreMatch = nextLine.match(/(?:Raw\s+Score|Percentage)\s+(\d+\.?\d*)\/(\d+\.?\d*)/i);
-                if (rawScoreMatch) {
-                  earned = parseFloat(rawScoreMatch[1]);
-                  possible = parseFloat(rawScoreMatch[2]);
-                  foundScore = true;
-                }
-              }
-              
+
               // Format 3: "X.XX/Y.YYY" (but not dates)
               if (!foundScore) {
                 const scoreMatch = nextLine.match(/(\d+\.?\d*)\/(\d+\.?\d*)/);

@@ -1,7 +1,9 @@
-  rules_version = '2';
+
+ rules_version = '2';
 
   service cloud.firestore {
     match /databases/{database}/documents {
+
       
       // Helper functions for authentication and validation
       function isAuthenticated() {
@@ -27,6 +29,17 @@
       function emailsMatch(a, b) {
         return normalizeEmail(a) == normalizeEmail(b) && normalizeEmail(a) != '';
       }
+
+      function clubHubStudentModeSelfOnly() {
+        return emailsMatch('1021676@lcps.org', request.auth.token.email);
+      }
+
+      function clubHubStudentModeFieldOk() {
+        return !('clubHubStudentMode' in request.resource.data) ||
+          (request.resource.data.clubHubStudentMode is bool &&
+            (request.resource.data.clubHubStudentMode == resource.data.get('clubHubStudentMode', false) ||
+              clubHubStudentModeSelfOnly()));
+      }
       
       function isValidRole(role) {
         return role in ['student', 'teacher', 'admin'];
@@ -35,13 +48,72 @@
       function isValidMathLabRole(role) {
         return role in ['', 'tutor', 'student'];
       }
+
+      function isValidWritingCenterRole(role) {
+        return role in ['', 'tutor'];
+      }
       
       function isValidCourse(course) {
-        return course in ['Algebra 1', 'Algebra 2', 'Algebra 2 Trig', 'Functions', 'Trig with Adv Alg', 'Geometry'];
+        return course in [
+          // Current Math Lab courses
+          'Precalculus (any level)',
+          'AP Calc AB',
+          'AP Calc BC',
+          'DE Multivariable Calc',
+          // Legacy names (existing requests / completed sessions)
+          'Precalc',
+          'Calc AB',
+          'Calc BC',
+          'Multivariable Calc',
+          'Algebra 1',
+          'Algebra 2',
+          'Algebra 2 Trig',
+          'Functions',
+          'Trig with Adv Alg',
+          'Geometry'
+        ];
       }
       
       function isValidRequestStatus(status) {
         return status in ['pending', 'accepted', 'completed', 'cancelled'];
+      }
+
+      function isValidMathLabRequestType(value) {
+        return value in ['now', 'scheduled'];
+      }
+
+      // 7:00–9:10 /10min + 9:15; 16:20–18:00 /10min
+      function isValidScheduledTime(value) {
+        return value in [
+          '07:00', '07:10', '07:20', '07:30', '07:40', '07:50',
+          '08:00', '08:10', '08:20', '08:30', '08:40', '08:50',
+          '09:00', '09:10', '09:15',
+          '16:20', '16:30', '16:40', '16:50',
+          '17:00', '17:10', '17:20', '17:30', '17:40', '17:50',
+          '18:00'
+        ];
+      }
+
+      function isValidScheduledDate(value) {
+        return value is string && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      }
+
+      function mathLabScheduleFieldsValid(data) {
+        return (!('requestType' in data) || isValidMathLabRequestType(data.requestType)) &&
+          (
+            !('requestType' in data) ||
+            data.requestType != 'scheduled' ||
+            (
+              isValidScheduledTime(data.scheduledTime) &&
+              isValidScheduledDate(data.scheduledDate)
+            )
+          );
+      }
+
+      function mathLabScheduleFieldsUnchanged() {
+        return request.resource.data.get('requestType', 'now') == resource.data.get('requestType', 'now') &&
+          request.resource.data.get('scheduledTime', '') == resource.data.get('scheduledTime', '') &&
+          request.resource.data.get('scheduledDate', '') == resource.data.get('scheduledDate', '');
       }
       
       function isAdminByEmail() {
@@ -55,18 +127,82 @@
         return normalizeEmail(email) in ['1021676@lcps.org', 'shail40926@gmail.com'];
       }
 
+      function authUserDocPath() {
+        return /databases/$(database)/documents/users/$(request.auth.uid);
+      }
+
+      function authUserExists() {
+        return isAuthenticated() && exists(authUserDocPath());
+      }
+
+      function authUserData() {
+        return get(authUserDocPath()).data;
+      }
+
+      /** Config allowlist only — full site super admin. */
+      function isSiteAdmin() {
+        return isAdminByEmail();
+      }
+
+      function isLegacyMathLabAdminRole() {
+        return authUserExists() &&
+              request.auth.token.email is string &&
+              authUserData().role in ['admin', 'ADMIN'] &&
+              !isProtectedAdminEmail(request.auth.token.email);
+      }
+
+      function isMathLabAdmin() {
+        return isSiteAdmin() ||
+              (authUserExists() && authUserData().get('mathLabAdmin', false) == true) ||
+              isLegacyMathLabAdminRole();
+      }
+
+      function isWritingCenterAdmin() {
+        return isSiteAdmin() ||
+              (authUserExists() && authUserData().get('writingCenterAdmin', false) == true);
+      }
+
       function isFirestoreAdmin() {
-        return isAuthenticated() &&
-              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        return isSiteAdmin();
+      }
+
+      function writingCenterUserRole() {
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role is string
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+          : '';
+      }
+
+      function writingCenterRoleField() {
+        return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              ('writingCenterRole' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.writingCenterRole is string
+          ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.writingCenterRole
+          : '';
       }
 
       function isAnyAdmin() {
-        return isAdminByEmail() || isFirestoreAdmin();
+        return isSiteAdmin();
+      }
+
+      function boolProfileFieldUnchanged(field) {
+        return request.resource.data.get(field, false) == resource.data.get(field, false);
       }
 
       function mathLabRoleValue(data) {
         return ('mathLabRole' in data && data.mathLabRole is string) ? data.mathLabRole : '';
+      }
+
+      function writingCenterRoleValue(data) {
+        return ('writingCenterRole' in data && data.writingCenterRole is string)
+          ? data.writingCenterRole
+          : '';
+      }
+
+      function studyHallBlocksValue(data) {
+        return ('studyHallBlocks' in data && data.studyHallBlocks is list)
+          ? data.studyHallBlocks
+          : [];
       }
 
       function pendingTeamDocPath(email) {
@@ -80,27 +216,88 @@
               get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'admin';
       }
 
-      function hasPendingTutorGrant() {
+      function pendingTutorServicesInclude(tutorService) {
         return isAuthenticated() &&
               request.resource.data.email is string &&
               exists(pendingTeamDocPath(normalizeEmail(request.resource.data.email))) &&
-              get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'tutor';
+              get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'tutor' &&
+              (
+                // Legacy pending tutor docs without services → Math Lab only
+                (!(('services' in get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data)) &&
+                  tutorService == 'mathlab') ||
+                (get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.services is list &&
+                  tutorService in get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.services)
+              );
+      }
+
+      function hasPendingTeacherGrant() {
+        return isAuthenticated() &&
+              request.resource.data.email is string &&
+              exists(pendingTeamDocPath(normalizeEmail(request.resource.data.email))) &&
+              get(pendingTeamDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'teacher';
+      }
+
+      function writingCenterPendingDocPath(email) {
+        return /databases/$(database)/documents/writingCenterTeamPending/$(email);
+      }
+
+      function hasPendingWritingCenterAdminGrant() {
+        return isAuthenticated() &&
+              request.resource.data.email is string &&
+              exists(writingCenterPendingDocPath(normalizeEmail(request.resource.data.email))) &&
+              get(writingCenterPendingDocPath(normalizeEmail(request.resource.data.email))).data.grantType == 'writingCenterAdmin';
       }
 
       function protectedAdminTeamFieldsUnchanged() {
         return !('email' in resource.data) ||
               !isProtectedAdminEmail(resource.data.email) ||
               (request.resource.data.role == resource.data.role &&
-                mathLabRoleValue(request.resource.data) == mathLabRoleValue(resource.data));
+                mathLabRoleValue(request.resource.data) == mathLabRoleValue(resource.data) &&
+                writingCenterRoleValue(request.resource.data) == writingCenterRoleValue(resource.data) &&
+                boolProfileFieldUnchanged('mathLabAdmin') &&
+                boolProfileFieldUnchanged('writingCenterAdmin'));
       }
+
+      function signupAllowlistDocPath() {
+        return /databases/$(database)/documents/siteConfig/signupAllowlist;
+      }
+
+      function isLcpsSignupEmail(email) {
+        return email is string &&
+              normalizeEmail(email).matches('.*@lcps\\.org$');
+      }
+
+      function isSignupExternalAllowlisted(email) {
+        return email is string &&
+              exists(signupAllowlistDocPath()) &&
+              get(signupAllowlistDocPath()).data.get('emailAllowlist', {}) is map &&
+              normalizeEmail(email) in get(signupAllowlistDocPath()).data.get('emailAllowlist', {});
+      }
+
+      function isAllowedSignupEmail(email) {
+        return isLcpsSignupEmail(email) || isSignupExternalAllowlisted(email);
+      }
+
       
-      // Helper function to check if user is a tutor (by mathLabRole or admin role)
+      // Helper function to check if user is a Math Lab tutor
       function isTutor() {
         return isAuthenticated() && 
               exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
               (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mathLabRole == 'tutor' ||
-                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-                isAdminByEmail());
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' ||
+                isMathLabAdmin());
+      }
+
+      function canReadTutoringRequest() {
+        return isAuthenticated() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.status == 'pending' ||
+          // Tutors can see the lab-wide active board (accepted sessions)
+          (isTutor() && resource.data.status == 'accepted') ||
+          (isTutor() && resource.data.tutorId == request.auth.uid) ||
+          isMathLabStaff() ||
+          isAdminByEmail()
+        );
       }
       
       // Helper function to check if user is a student (by mathLabRole or default role)
@@ -112,17 +309,32 @@
                 get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'));
       }
       
-      // Helper function to check if user is teacher or admin
+      // Library Pass / teacher staff (not product-scoped Math Lab admins).
       function isTeacherOrAdmin() {
-        return isAuthenticated() && 
+        return isSiteAdmin() ||
+              (isAuthenticated() &&
               exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'admin'];
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'TEACHER']);
+      }
+
+      function isMathLabStaff() {
+        return isMathLabAdmin() ||
+              (isAuthenticated() &&
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'TEACHER']);
       }
       
       // Users collection - Contains user profile data
       match /users/{userId} {
-        // Allow read: Own document or admins can read all
-        allow read: if isAuthenticated() && (isOwner(userId) || isAnyAdmin());
+        // Own profile, admins, or public teacher directory (for receipt sharing)
+        allow read: if isAuthenticated() && (
+                          isOwner(userId) ||
+                          isSiteAdmin() ||
+                          isMathLabAdmin() ||
+                          isWritingCenterAdmin() ||
+                          (resource.data.role is string &&
+                            resource.data.role in ['teacher', 'TEACHER'])
+                        );
         
         // Allow create: During signup process
         allow create: if isAuthenticated() && 
@@ -143,16 +355,35 @@
                         request.resource.data.email is string &&
                         request.resource.data.email == normalizeEmail(request.resource.data.email) &&
                         emailsMatch(request.resource.data.email, request.auth.token.email) &&
-                        // Allow admin role for built-in admins, pending grants, or default student
+                        (isAllowedSignupEmail(request.auth.token.email) || isAdminByEmail()) &&
+                        // Allow admin/teacher via pending grants, built-in admins, or default student
                         (isAdminByEmail() ||
-                          request.resource.data.role == 'student' ||
-                          (request.resource.data.role == 'admin' && hasPendingAdminGrant())) &&
-                        // mathLabRole on signup: empty, or tutor when pre-approved
+                          (request.resource.data.role == 'student' &&
+                            request.resource.data.get('mathLabAdmin', false) != true &&
+                            request.resource.data.get('writingCenterAdmin', false) != true) ||
+                          (request.resource.data.role == 'teacher' && hasPendingTeacherGrant())) &&
+                        (!('mathLabAdmin' in request.resource.data) ||
+                          request.resource.data.mathLabAdmin is bool) &&
+                        (!('writingCenterAdmin' in request.resource.data) ||
+                          request.resource.data.writingCenterAdmin is bool) &&
+                        (request.resource.data.get('mathLabAdmin', false) != true ||
+                          hasPendingAdminGrant()) &&
+                        (request.resource.data.get('writingCenterAdmin', false) != true ||
+                          hasPendingWritingCenterAdminGrant()) &&
+                        // mathLabRole on signup: empty, or tutor when pre-approved for Math Lab
                         (!('mathLabRole' in request.resource.data) ||
                           (request.resource.data.mathLabRole is string &&
                             isValidMathLabRole(request.resource.data.mathLabRole) &&
                             (request.resource.data.mathLabRole == '' ||
-                              (request.resource.data.mathLabRole == 'tutor' && hasPendingTutorGrant()))));
+                              (request.resource.data.mathLabRole == 'tutor' &&
+                                pendingTutorServicesInclude('mathlab'))))) &&
+                        // writingCenterRole on signup: empty, or tutor when pre-approved for WC
+                        (!('writingCenterRole' in request.resource.data) ||
+                          (request.resource.data.writingCenterRole is string &&
+                            isValidWritingCenterRole(request.resource.data.writingCenterRole) &&
+                            (request.resource.data.writingCenterRole == '' ||
+                              (request.resource.data.writingCenterRole == 'tutor' &&
+                                pendingTutorServicesInclude('writing-center')))));
         
         // Allow update: Own document with restrictions, or admin updates
         allow update: if isAuthenticated() && (
@@ -170,40 +401,42 @@
                           request.resource.data.updatedAt is timestamp &&
                           // Only allow role changes by admins or prevent role escalation
                           (isAdminByEmail() || request.resource.data.role == resource.data.role) &&
+                          // writingCenterRole is admin-managed only (owners cannot self-grant)
+                          writingCenterRoleValue(request.resource.data) == writingCenterRoleValue(resource.data) &&
+                          // studyHallBlocks is admin-managed only
+                          studyHallBlocksValue(request.resource.data) == studyHallBlocksValue(resource.data) &&
                           // Validate optional fields if present
                           (!('mathLabRole' in request.resource.data) || 
                             (request.resource.data.mathLabRole is string && 
                             isValidMathLabRole(request.resource.data.mathLabRole))) &&
+                          (!('writingCenterRole' in request.resource.data) ||
+                            (request.resource.data.writingCenterRole is string &&
+                            isValidWritingCenterRole(request.resource.data.writingCenterRole))) &&
                           (!('photoURL' in request.resource.data) || 
                             (request.resource.data.photoURL is string && 
-                            request.resource.data.photoURL.size() <= 500))) ||
-                          // Admin updates (can modify any user; built-in admins are protected)
-                          (isAnyAdmin() && protectedAdminTeamFieldsUnchanged())
+                            request.resource.data.photoURL.size() <= 500)) &&
+                          clubHubStudentModeFieldOk()) ||
+                          // Product / site admins (built-in admins are protected)
+                          (isSiteAdmin() && protectedAdminTeamFieldsUnchanged()) ||
+                          (isMathLabAdmin() &&
+                            protectedAdminTeamFieldsUnchanged() &&
+                            boolProfileFieldUnchanged('writingCenterAdmin') &&
+                            request.resource.data.role != 'admin') ||
+                          (isWritingCenterAdmin() &&
+                            protectedAdminTeamFieldsUnchanged() &&
+                            boolProfileFieldUnchanged('mathLabAdmin') &&
+                            mathLabRoleValue(request.resource.data) == mathLabRoleValue(resource.data) &&
+                            request.resource.data.role == resource.data.role)
                         );
         
         // Allow delete: Only admins can delete users
         allow delete: if isAdminByEmail();
       }
+
       
       // TutoringRequests collection - Contains math lab tutoring requests
       match /tutoringRequests/{requestId} {
-        // Allow read: 
-        // - Users can read their own requests (as student)
-        // - Tutors can read requests they're assigned to (as tutor)
-        // - Anyone can read pending requests (for tutor dashboard)
-        // - Teachers/admins can read all requests
-        allow read: if isAuthenticated() && (
-                        // Users can read their own requests
-                        resource.data.studentId == request.auth.uid ||
-                        // Tutors can read requests they're assigned to
-                        (isTutor() && resource.data.tutorId == request.auth.uid) ||
-                        // Anyone can read pending requests (for tutor dashboard)
-                        resource.data.status == 'pending' ||
-                        // Teachers and admins can read all requests
-                        isTeacherOrAdmin() ||
-                        // Admins can read all requests
-                        isAdminByEmail()
-                      );
+        allow read: if canReadTutoringRequest();
         
         // Allow create: Any authenticated user can create requests
         allow create: if isAuthenticated() &&
@@ -224,6 +457,7 @@
                         request.resource.data.status == 'pending' &&
                         request.resource.data.createdAt is timestamp &&
                         request.resource.data.updatedAt is timestamp &&
+                        mathLabScheduleFieldsValid(request.resource.data) &&
                         // Validate optional fields if present
                         (!('tutorId' in request.resource.data) || 
                         (request.resource.data.tutorId is string && 
@@ -254,7 +488,8 @@
                           request.resource.data.description is string &&
                           request.resource.data.description.size() > 0 &&
                           request.resource.data.description.size() <= 1000 &&
-                          request.resource.data.updatedAt is timestamp) ||
+                          request.resource.data.updatedAt is timestamp &&
+                          mathLabScheduleFieldsUnchanged()) ||
                           // Tutors can update pending requests (to accept them)
                           (isTutor() && 
                           resource.data.status == 'pending' &&
@@ -266,6 +501,7 @@
                           request.resource.data.description == resource.data.description &&
                           request.resource.data.createdAt == resource.data.createdAt &&
                           request.resource.data.updatedAt is timestamp &&
+                          mathLabScheduleFieldsUnchanged() &&
                           // Validate new fields for accepted status
                           request.resource.data.tutorId is string &&
                           request.resource.data.tutorId == request.auth.uid &&
@@ -283,9 +519,9 @@
                           request.resource.data.tutorId == resource.data.tutorId &&
                           request.resource.data.studentId == resource.data.studentId &&
                           request.resource.data.course == resource.data.course &&
-                          request.resource.data.description == resource.data.description &&
                           request.resource.data.createdAt == resource.data.createdAt &&
                           request.resource.data.updatedAt is timestamp &&
+                          mathLabScheduleFieldsUnchanged() &&
                           // Validate optional fields
                           (!('acceptedAt' in request.resource.data) || 
                             (request.resource.data.acceptedAt is timestamp)) &&
@@ -294,9 +530,8 @@
                           (!('completedAt' in request.resource.data) || 
                             (request.resource.data.completedAt is timestamp))) ||
                           // Teachers and admins can update any request
-                          isTeacherOrAdmin() ||
-                          // Admins can update any request
-                          isAdminByEmail()
+                          isMathLabStaff() ||
+                          isMathLabAdmin()
                         );
         
         // Allow delete: 
@@ -311,9 +546,8 @@
                           (isTutor() && 
                           resource.data.tutorId == request.auth.uid) ||
                           // Teachers and admins can delete any request
-                          isTeacherOrAdmin() ||
-                          // Admins can delete any request
-                          isAdminByEmail()
+                          isMathLabStaff() ||
+                          isMathLabAdmin()
                         );
       }
       
@@ -329,8 +563,7 @@
                         // Tutors can read sessions they conducted
                         (isTutor() && resource.data.tutorId == request.auth.uid) ||
                         // Teachers and admins can read all sessions
-                        isTeacherOrAdmin() ||
-                        // Admins can read all sessions
+                        isMathLabStaff() ||
                         isAdminByEmail()
                       );
         
@@ -364,33 +597,917 @@
                         (request.resource.data.tutorEmail is string && 
                           isValidEmail(request.resource.data.tutorEmail))) &&
                         // Allow creation by tutors (for their own sessions) or teachers/admins
-                        (isTutor() || isTeacherOrAdmin() || isAdminByEmail());
+                        (isTutor() || isMathLabStaff() || isAdminByEmail());
         
         // Allow update: Only teachers/admins can update completed sessions
-        allow update: if isTeacherOrAdmin() || isAdminByEmail();
+        allow update: if isMathLabStaff() || isAdminByEmail();
         
         // Allow delete: Only teachers/admins can delete completed sessions
-        allow delete: if isTeacherOrAdmin() || isAdminByEmail();
+        allow delete: if isMathLabStaff() || isMathLabAdmin();
       }
 
       // Pre-signup tutor/admin grants (document id = normalized email)
       match /mathLabTeamPending/{emailKey} {
         allow read: if isAuthenticated() &&
-                      (isAnyAdmin() || emailsMatch(request.auth.token.email, emailKey));
-        allow create, update: if isAnyAdmin() &&
+                      (isMathLabAdmin() || emailsMatch(request.auth.token.email, emailKey));
+        allow create, update: if isMathLabAdmin() &&
                                 request.resource.data.keys().hasAll(['email', 'grantType', 'createdAt', 'updatedAt']) &&
                                 request.resource.data.email is string &&
                                 normalizeEmail(request.resource.data.email) == normalizeEmail(emailKey) &&
                                 isValidEmail(request.resource.data.email) &&
-                                request.resource.data.grantType in ['tutor', 'admin'] &&
+                                request.resource.data.grantType in ['tutor', 'admin', 'teacher'] &&
                                 request.resource.data.createdAt is timestamp &&
                                 request.resource.data.updatedAt is timestamp &&
-                                !isProtectedAdminEmail(request.resource.data.email);
-        allow delete: if isAnyAdmin() ||
+                                !isProtectedAdminEmail(request.resource.data.email) &&
+                                (request.resource.data.grantType != 'tutor' ||
+                                  (request.resource.data.services is list &&
+                                    request.resource.data.services.size() >= 1 &&
+                                    request.resource.data.services.size() <= 2));
+        allow delete: if isMathLabAdmin() ||
                         (isAuthenticated() && emailsMatch(request.auth.token.email, emailKey));
       }
 
-      // Deny all other collections and documents
+
+      function isSlotHost() {
+        return isTutor() || isTeacherOrAdmin() || isAdminByEmail();
+      }
+
+      function isValidSlotType(t) {
+        return t in ['tutoring', 'remediation', 'retake', 'office_hours'];
+      }
+
+      function isValidSlotStatus(s) {
+        return s in ['open', 'full', 'closed', 'cancelled'];
+      }
+
+      function isWritingCenterTimestamp(value) {
+        return value is timestamp ||
+          (value is string && value.size() > 0 && value.size() <= 40);
+      }
+
+      function isValidWritingCenterSessionType(t) {
+        return t in ['IN_PERSON', 'ASYNC', 'MINI_LESSON'];
+      }
+
+      function isAdminMiniLessonCreate() {
+        return isWritingCenterAdmin() &&
+          request.resource.data.sessionType == 'MINI_LESSON' &&
+          request.resource.data.status == 'COMPLETED' &&
+          request.resource.data.studentId == 'wc-mini-lesson' &&
+          request.resource.data.studentName is string &&
+          request.resource.data.studentName.size() > 0 &&
+          request.resource.data.studentEmail is string &&
+          request.resource.data.subject is string &&
+          request.resource.data.subject.size() > 0 &&
+          request.resource.data.notes is string &&
+          request.resource.data.tutorIds is list &&
+          request.resource.data.tutorIds.size() > 0 &&
+          request.resource.data.tutorIds.size() <= 30 &&
+          request.resource.data.tutorId is string &&
+          request.resource.data.tutorId.size() > 0 &&
+          request.resource.data.tutorName is string &&
+          request.resource.data.tutorName.size() > 0 &&
+          request.resource.data.teacherId is string &&
+          request.resource.data.teacherId.size() > 0 &&
+          request.resource.data.teacherName is string &&
+          request.resource.data.teacherName.size() > 0 &&
+          isWritingCenterTimestamp(request.resource.data.createdAt) &&
+          isWritingCenterTimestamp(request.resource.data.updatedAt);
+      }
+
+      function isMiniLessonOverseeingTeacher() {
+        return isAuthenticated() &&
+          resource.data.sessionType == 'MINI_LESSON' &&
+          resource.data.teacherId == request.auth.uid;
+      }
+
+      function isMiniLessonTeacherReportUpdate() {
+        return isMiniLessonOverseeingTeacher() &&
+          request.resource.data.sessionType == resource.data.sessionType &&
+          request.resource.data.teacherId == resource.data.teacherId &&
+          request.resource.data.tutorId == resource.data.tutorId &&
+          request.resource.data.tutorIds == resource.data.tutorIds &&
+          request.resource.data.status == resource.data.status &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'sessionReportUrl', 'sessionReportStoragePath', 'sessionReportFileName',
+            'sessionReportUploadedAt', 'sessionReportUploadedBy', 'updatedAt'
+          ]);
+      }
+
+      function isValidWritingCenterStatus(s) {
+        return s in ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+      }
+
+      function isWritingCenterTutor() {
+        return isAuthenticated() &&
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              (
+                writingCenterRoleField() == 'tutor' ||
+                writingCenterUserRole() in ['tutor', 'TUTOR', 'teacher', 'TEACHER']
+              );
+      }
+
+      // Writing Center sessions
+      match /sessions/{sessionId} {
+        allow read: if isAuthenticated() && (
+                        resource.data.studentId == request.auth.uid ||
+                        resource.data.tutorId == request.auth.uid ||
+                        (resource.data.tutorIds is list &&
+                          request.auth.uid in resource.data.tutorIds) ||
+                        resource.data.teacherId == request.auth.uid ||
+                        resource.data.status == 'PENDING' ||
+                        isWritingCenterTutor() ||
+                        isWritingCenterAdmin()
+                      );
+
+        allow create: if isAdminMiniLessonCreate() ||
+                        (isAuthenticated() &&
+                        request.resource.data.keys().hasAll([
+                          'studentId', 'studentName', 'studentEmail', 'subject', 'notes',
+                          'sessionType', 'status', 'createdAt', 'updatedAt'
+                        ]) &&
+                        request.resource.data.studentId == request.auth.uid &&
+                        request.resource.data.studentName is string &&
+                        request.resource.data.studentName.size() > 0 &&
+                        request.resource.data.studentEmail is string &&
+                        request.resource.data.subject is string &&
+                        request.resource.data.subject.size() > 0 &&
+                        request.resource.data.notes is string &&
+                        isValidWritingCenterSessionType(request.resource.data.sessionType) &&
+                        request.resource.data.status == 'PENDING' &&
+                        isWritingCenterTimestamp(request.resource.data.createdAt) &&
+                        isWritingCenterTimestamp(request.resource.data.updatedAt));
+
+        allow update: if isAuthenticated() && (
+                          (resource.data.studentId == request.auth.uid &&
+                            request.resource.data.studentId == resource.data.studentId) ||
+                          (resource.data.tutorId == request.auth.uid &&
+                            request.resource.data.tutorId == resource.data.tutorId &&
+                            resource.data.sessionType != 'MINI_LESSON') ||
+                          (isWritingCenterTutor() &&
+                            resource.data.status == 'PENDING' &&
+                            request.resource.data.tutorId == request.auth.uid) ||
+                          isMiniLessonTeacherReportUpdate() ||
+                          isWritingCenterAdmin()
+                        );
+
+        allow delete: if isAuthenticated() && (
+                          resource.data.studentId == request.auth.uid ||
+                          isWritingCenterAdmin()
+                        );
+      }
+
+      // Writing Center receipts shared with teachers
+      match /writingCenterReceiptShares/{shareId} {
+        allow read: if isAuthenticated() && (
+                          resource.data.teacherId == request.auth.uid ||
+                          resource.data.studentId == request.auth.uid ||
+                          isWritingCenterAdmin()
+                        );
+
+        allow create, update: if isAuthenticated() &&
+                                request.resource.data.keys().hasAll([
+                                  'sessionId', 'studentId', 'teacherId',
+                                  'sessionReportUrl', 'sharedAt', 'sharedBy'
+                                ]) &&
+                                request.resource.data.studentId == request.auth.uid &&
+                                request.resource.data.sharedBy == request.auth.uid &&
+                                request.resource.data.sessionId is string &&
+                                request.resource.data.sessionId.size() > 0 &&
+                                request.resource.data.teacherId is string &&
+                                request.resource.data.teacherId.size() > 0 &&
+                                request.resource.data.sessionReportUrl is string &&
+                                request.resource.data.sessionReportUrl.size() > 0 &&
+                                request.resource.data.sharedAt is timestamp &&
+                                // Must be sharing their own completed session with a report
+                                exists(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)) &&
+                                get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.studentId == request.auth.uid &&
+                                get(/databases/$(database)/documents/sessions/$(request.resource.data.sessionId)).data.status == 'COMPLETED' &&
+                                // Destination must be a teacher account
+                                exists(/databases/$(database)/documents/users/$(request.resource.data.teacherId)) &&
+                                get(/databases/$(database)/documents/users/$(request.resource.data.teacherId)).data.role in ['teacher', 'TEACHER'];
+
+        allow delete: if isAuthenticated() && (
+                          resource.data.studentId == request.auth.uid ||
+                          isWritingCenterAdmin()
+                        );
+      }
+
+      // Office Hour Scheduler
+      match /officeHourSlots/{slotId} {
+        allow read: if isAuthenticated();
+
+        allow create: if isSlotHost() &&
+                        request.resource.data.keys().hasAll([
+                          'hostId', 'hostName', 'slotType', 'course', 'startAt', 'endAt',
+                          'maxCapacity', 'bookedCount', 'status', 'createdAt', 'updatedAt'
+                        ]) &&
+                        request.resource.data.hostId == request.auth.uid &&
+                        request.resource.data.hostName is string &&
+                        request.resource.data.slotType == 'office_hours' &&
+                        request.resource.data.course is string &&
+                        request.resource.data.startAt is timestamp &&
+                        request.resource.data.endAt is timestamp &&
+                        request.resource.data.maxCapacity is int &&
+                        request.resource.data.maxCapacity >= 1 &&
+                        request.resource.data.maxCapacity <= 50 &&
+                        request.resource.data.bookedCount == 0 &&
+                        request.resource.data.status == 'open' &&
+                        (!('signupCloseMinutes' in request.resource.data) ||
+                          (request.resource.data.signupCloseMinutes is int &&
+                          request.resource.data.signupCloseMinutes >= 0 &&
+                          request.resource.data.signupCloseMinutes <= 10080)) &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp;
+
+        allow update: if isAuthenticated() &&
+                        resource.data.hostId == request.auth.uid &&
+                        request.resource.data.hostId == resource.data.hostId &&
+                        request.resource.data.bookedCount == resource.data.bookedCount &&
+                        isValidSlotStatus(request.resource.data.status);
+
+        allow update: if isAuthenticated() &&
+                        request.resource.data.bookedCount == resource.data.bookedCount + 1 &&
+                        request.resource.data.bookedCount <= request.resource.data.maxCapacity &&
+                        request.resource.data.status in ['open', 'full'];
+
+        allow update: if isAuthenticated() &&
+                        request.resource.data.bookedCount == resource.data.bookedCount - 1 &&
+                        request.resource.data.bookedCount >= 0 &&
+                        request.resource.data.status in ['open', 'full'];
+
+        allow delete: if isAuthenticated() &&
+                        resource.data.hostId == request.auth.uid &&
+                        resource.data.bookedCount == 0;
+      }
+
+      match /writingCenterTeamPending/{emailKey} {
+        allow read: if isAuthenticated() &&
+                      (isWritingCenterAdmin() || emailsMatch(request.auth.token.email, emailKey));
+        allow create, update: if isWritingCenterAdmin() &&
+                                request.resource.data.keys().hasAll(['email', 'grantType', 'createdAt', 'updatedAt']) &&
+                                request.resource.data.email is string &&
+                                normalizeEmail(request.resource.data.email) == normalizeEmail(emailKey) &&
+                                isValidEmail(request.resource.data.email) &&
+                                request.resource.data.grantType == 'writingCenterAdmin' &&
+                                request.resource.data.createdAt is timestamp &&
+                                request.resource.data.updatedAt is timestamp &&
+                                !isProtectedAdminEmail(request.resource.data.email);
+        allow delete: if isWritingCenterAdmin() ||
+                        (isAuthenticated() && emailsMatch(request.auth.token.email, emailKey));
+      }
+
+
+      match /officeHourBookings/{bookingId} {
+        function isOwnOfficeHourBookingId() {
+          return bookingId is string && bookingId.matches('^.*_' + request.auth.uid + '$');
+        }
+
+        allow read: if isAuthenticated() && (
+                        isOwnOfficeHourBookingId() ||
+                        (resource != null && resource.data.studentId == request.auth.uid) ||
+                        (resource != null && resource.data.hostId == request.auth.uid) ||
+                        isSlotHost()
+                      );
+
+        allow create: if isAuthenticated() &&
+                        request.resource.data.keys().hasAll([
+                          'slotId', 'studentId', 'studentName', 'status', 'createdAt', 'updatedAt'
+                        ]) &&
+                        request.resource.data.studentId == request.auth.uid &&
+                        request.resource.data.status == 'confirmed' &&
+                        bookingId == request.resource.data.slotId + '_' + request.auth.uid &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp;
+
+        allow update: if isAuthenticated() &&
+                        resource.data.studentId == request.auth.uid &&
+                        request.resource.data.studentId == resource.data.studentId &&
+                        request.resource.data.status == 'cancelled';
+      }
+
+      function isValidLibraryBlockId(blockId) {
+        return blockId is int && blockId >= 1 && blockId <= 8;
+      }
+
+      // Empty / missing studyHallBlocks = unrestricted (legacy). Otherwise block must be listed.
+      function studentMayClaimLibraryBlock(blockId) {
+        let allowed = studyHallBlocksValue(
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        );
+        return allowed.size() == 0 || blockId in allowed;
+      }
+
+      function libraryPassSettingsData() {
+        return get(/databases/$(database)/documents/libraryPassSettings/config).data;
+      }
+
+      function libraryPassesEnabled() {
+        return !exists(/databases/$(database)/documents/libraryPassSettings/config) ||
+              libraryPassSettingsData().passesEnabled != false;
+      }
+
+      match /libraryPassSettings/{docId} {
+        allow read: if isAuthenticated();
+        allow create, update: if (isTeacherOrAdmin() || isAdminByEmail()) &&
+                                request.resource.data.passesEnabled is bool &&
+                                request.resource.data.blockCapacities is map &&
+                                request.resource.data.updatedAt is timestamp &&
+                                (!('dayTypeOverride' in request.resource.data) ||
+                                  request.resource.data.dayTypeOverride == null ||
+                                  request.resource.data.dayTypeOverride in ['A', 'B']);
+        allow delete: if isTeacherOrAdmin() || isAdminByEmail();
+      }
+
+      match /libraryPasses/{passId} {
+        // Students list today's passes to see block availability (counts).
+        allow read: if isAuthenticated();
+
+        allow create: if isAuthenticated() &&
+                        libraryPassesEnabled() &&
+                        request.resource.data.keys().hasAll([
+                          'date', 'blockId', 'studentId', 'studentName', 'studentEmail',
+                          'status', 'createdAt', 'updatedAt'
+                        ]) &&
+                        request.resource.data.studentId == request.auth.uid &&
+                        request.resource.data.status == 'active' &&
+                        request.resource.data.date is string &&
+                        request.resource.data.date.size() == 10 &&
+                        isValidLibraryBlockId(request.resource.data.blockId) &&
+                        studentMayClaimLibraryBlock(request.resource.data.blockId) &&
+                        request.resource.data.studentName is string &&
+                        request.resource.data.studentName.size() > 0 &&
+                        request.resource.data.studentName.size() <= 100 &&
+                        request.resource.data.studentEmail is string &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp &&
+                        passId == request.resource.data.date + '_' + request.auth.uid;
+
+        allow delete: if isAuthenticated() && (
+                          resource.data.studentId == request.auth.uid ||
+                          isTeacherOrAdmin() ||
+                          isAdminByEmail()
+                        );
+      }
+
+
+      // Club Hub access contract: client UI may use live clubHubSponsors overrides;
+      // Firestore writes require synced clubHubAccess (directoryClubSlugs / manualClubSlugs).
+
+      function isProtectedClubHubCoordinator() {
+        return isAuthenticated() &&
+              request.auth.token.email is string &&
+              normalizeEmail(request.auth.token.email) == 'katrice.white@lcps.org';
+      }
+
+      function clubHubAccessDocPath(email) {
+        return /databases/$(database)/documents/clubHubAccess/$(normalizeEmail(email));
+      }
+
+      function clubHubAccessForAuthUser() {
+        return get(clubHubAccessDocPath(request.auth.token.email)).data;
+      }
+
+      function clubHubSlugAllowedInMap(slugMap, slug) {
+        return slugMap is map &&
+              slug in slugMap &&
+              slugMap[slug] == true;
+      }
+
+      function isClubHubCoordinatorAccess() {
+        return isProtectedClubHubCoordinator() ||
+              (isAuthenticated() &&
+                request.auth.token.email is string &&
+                exists(clubHubAccessDocPath(request.auth.token.email)) &&
+                clubHubAccessForAuthUser().isCoordinator == true);
+      }
+
+      function isClubHubAdmin() {
+        return isSiteAdmin() || isClubHubCoordinatorAccess();
+      }
+
+      function canEditClubHubPage(slug) {
+        return isClubHubAdmin() ||
+              (isAuthenticated() &&
+                request.auth.token.email is string &&
+                exists(clubHubAccessDocPath(request.auth.token.email)) &&
+                (
+                  clubHubSlugAllowedInMap(clubHubAccessForAuthUser().get('directoryClubSlugs', {}), slug) ||
+                  clubHubSlugAllowedInMap(clubHubAccessForAuthUser().get('manualClubSlugs', {}), slug) ||
+                  clubHubSlugAllowedInMap(clubHubAccessForAuthUser().get('boardClubSlugs', {}), slug) ||
+                  clubHubSlugAllowedInMap(clubHubAccessForAuthUser().get('clubSlugs', {}), slug)
+                ));
+      }
+
+      function isValidClubHubSlugMap(field) {
+        return field is map && field.size() <= 120;
+      }
+
+      function isValidClubHubAccessWrite(emailKey) {
+        return request.resource.data.email is string &&
+              isValidEmail(request.resource.data.email) &&
+              request.resource.data.email == normalizeEmail(request.resource.data.email) &&
+              normalizeEmail(request.resource.data.email) == normalizeEmail(emailKey) &&
+              request.resource.data.isCoordinator is bool &&
+              isValidClubHubSlugMap(request.resource.data.get('manualClubSlugs', {})) &&
+              isValidClubHubSlugMap(request.resource.data.get('directoryClubSlugs', {})) &&
+              isValidClubHubSlugMap(request.resource.data.get('boardClubSlugs', {})) &&
+              request.resource.data.updatedAt is timestamp &&
+              request.resource.data.updatedBy == request.auth.uid;
+      }
+
+      match /clubHubSponsors/{slug} {
+        allow read: if true;
+        allow create, update: if isClubHubAdmin() &&
+                                request.resource.data.slug == slug &&
+                                request.resource.data.slug is string &&
+                                request.resource.data.slug.size() > 0 &&
+                                request.resource.data.slug.size() <= 120 &&
+                                request.resource.data.clubName is string &&
+                                request.resource.data.clubName.size() > 0 &&
+                                request.resource.data.clubName.size() <= 120 &&
+                                request.resource.data.sponsors is list &&
+                                request.resource.data.sponsors.size() <= 10 &&
+                                request.resource.data.updatedAt is timestamp &&
+                                request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if isClubHubAdmin();
+      }
+
+      match /clubHubMeetingDays/{slug} {
+        allow read: if true;
+        allow create, update: if isClubHubAdmin() &&
+                                request.resource.data.keys().hasOnly(
+                                  ['slug', 'clubName', 'meetingDay', 'updatedAt', 'updatedBy']) &&
+                                request.resource.data.slug == slug &&
+                                request.resource.data.slug is string &&
+                                request.resource.data.slug.size() > 0 &&
+                                request.resource.data.slug.size() <= 120 &&
+                                request.resource.data.clubName is string &&
+                                request.resource.data.clubName.size() <= 120 &&
+                                request.resource.data.meetingDay in ['gold', 'maroon', 'both', 'general'] &&
+                                request.resource.data.updatedAt is timestamp &&
+                                request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if isClubHubAdmin();
+      }
+
+      match /clubHubAccess/{emailKey} {
+        allow read: if isAuthenticated() && (
+          isClubHubAdmin() ||
+          emailsMatch(request.auth.token.email, emailKey)
+        );
+        allow create, update: if isClubHubAdmin() && isValidClubHubAccessWrite(emailKey);
+        allow delete: if isClubHubAdmin() &&
+                        normalizeEmail(emailKey) != 'katrice.white@lcps.org';
+      }
+
+      match /clubHubBoardMembers/{clubSlug} {
+        allow read: if canEditClubHubPage(clubSlug);
+        allow write: if false;
+      }
+
+      match /clubHubBoardMembersByEmail/{emailKey} {
+        allow read: if isClubHubAdmin();
+        allow write: if false;
+      }
+
+      // Club Hub editable page copy
+      match /clubHubPages/{slug} {
+        allow read: if true;
+        allow create, update: if canEditClubHubPage(slug) &&
+                                request.resource.data.keys().hasAll([
+                                  'slug', 'about', 'updatedAt', 'updatedBy'
+                                ]) &&
+                                request.resource.data.slug == slug &&
+                                request.resource.data.slug is string &&
+                                request.resource.data.slug.size() > 0 &&
+                                request.resource.data.slug.size() <= 120 &&
+                                request.resource.data.about is string &&
+                                request.resource.data.about.size() > 0 &&
+                                request.resource.data.about.size() <= 4000 &&
+                                request.resource.data.updatedAt is timestamp &&
+                                request.resource.data.updatedBy == request.auth.uid &&
+                                (!('resourcesUrl' in request.resource.data) ||
+                                  (request.resource.data.resourcesUrl is string &&
+                                    request.resource.data.resourcesUrl.size() <= 500)) &&
+                                (!('resourcesLabel' in request.resource.data) ||
+                                  (request.resource.data.resourcesLabel is string &&
+                                    request.resource.data.resourcesLabel.size() <= 80)) &&
+                                (!('clubLeaders' in request.resource.data) ||
+                                  (request.resource.data.clubLeaders is string &&
+                                    request.resource.data.clubLeaders.size() <= 500)) &&
+                                (!('facultyAdvisor' in request.resource.data) ||
+                                  (request.resource.data.facultyAdvisor is string &&
+                                    request.resource.data.facultyAdvisor.size() <= 500)) &&
+                                (!('contactEmails' in request.resource.data) ||
+                                  (request.resource.data.contactEmails is string &&
+                                    request.resource.data.contactEmails.size() <= 1000)) &&
+                                (!('meetingFrequency' in request.resource.data) ||
+                                  (request.resource.data.meetingFrequency is string &&
+                                    request.resource.data.meetingFrequency.size() <= 200)) &&
+                                (!('memberCount' in request.resource.data) ||
+                                  (request.resource.data.memberCount is string &&
+                                    request.resource.data.memberCount.size() <= 40)) &&
+                                (!('headerImageUrl' in request.resource.data) ||
+                                  (request.resource.data.headerImageUrl is string &&
+                                    request.resource.data.headerImageUrl.size() <= 2000)) &&
+                                (!('memberSignupLimit' in request.resource.data) ||
+                                  request.resource.data.memberSignupLimit == null ||
+                                  (request.resource.data.memberSignupLimit is int &&
+                                    request.resource.data.memberSignupLimit >= 1 &&
+                                    request.resource.data.memberSignupLimit <= 5000)) &&
+                                (!('joinPolicy' in request.resource.data) ||
+                                  request.resource.data.joinPolicy == 'open' ||
+                                  request.resource.data.joinPolicy == 'approval');
+        allow delete: if isClubHubAdmin();
+      }
+
+      function clubHubMemberSignupLimitForSlug(clubSlug) {
+        let pagePath = /databases/$(database)/documents/clubHubPages/$(clubSlug);
+        return exists(pagePath) &&
+               ('memberSignupLimit' in get(pagePath).data) &&
+               get(pagePath).data.memberSignupLimit is int &&
+               get(pagePath).data.memberSignupLimit >= 1
+               ? get(pagePath).data.memberSignupLimit
+               : null;
+      }
+
+      function clubHubHasMemberSignupLimit(clubSlug) {
+        return clubHubMemberSignupLimitForSlug(clubSlug) != null;
+      }
+
+      function clubHubMembershipCountForSlug(clubSlug) {
+        let countPath = /databases/$(database)/documents/clubHubMembershipCounts/$(clubSlug);
+        return exists(countPath) ? get(countPath).data.memberCount : 0;
+      }
+
+      function clubHubCanAcceptNewMember(clubSlug) {
+        return !clubHubHasMemberSignupLimit(clubSlug) ||
+               clubHubMembershipCountForSlug(clubSlug) < clubHubMemberSignupLimitForSlug(clubSlug);
+      }
+
+      function clubHubJoinRequiresApproval(clubSlug) {
+        let pagePath = /databases/$(database)/documents/clubHubPages/$(clubSlug);
+        return exists(pagePath) && get(pagePath).data.get('joinPolicy', 'open') == 'approval';
+      }
+
+      function clubHubMembershipCountIncrementAllowed(clubSlug, newCount) {
+        return !clubHubHasMemberSignupLimit(clubSlug) ||
+               newCount <= clubHubMemberSignupLimitForSlug(clubSlug);
+      }
+
+      function isValidClubHubEventWrite() {
+        return request.resource.data.clubSlug is string &&
+              request.resource.data.clubSlug.size() > 0 &&
+              request.resource.data.clubSlug.size() <= 120 &&
+              request.resource.data.clubName is string &&
+              request.resource.data.clubName.size() > 0 &&
+              request.resource.data.clubName.size() <= 120 &&
+              request.resource.data.title is string &&
+              request.resource.data.title.size() > 0 &&
+              request.resource.data.title.size() <= 120 &&
+              request.resource.data.date is string &&
+              request.resource.data.date.size() == 10 &&
+              request.resource.data.time is string &&
+              request.resource.data.time.size() > 0 &&
+              request.resource.data.time.size() <= 40 &&
+              (!('description' in request.resource.data) ||
+                (request.resource.data.description is string &&
+                  request.resource.data.description.size() <= 500)) &&
+              (!('location' in request.resource.data) ||
+                (request.resource.data.location is string &&
+                  request.resource.data.location.size() <= 120)) &&
+              request.resource.data.updatedAt is timestamp &&
+              request.resource.data.updatedBy == request.auth.uid;
+      }
+
+      match /clubHubEvents/{eventId} {
+        allow read: if true;
+        allow create: if isAuthenticated() &&
+                        isValidClubHubEventWrite() &&
+                        canEditClubHubPage(request.resource.data.clubSlug) &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.createdBy == request.auth.uid;
+        allow update: if isAuthenticated() &&
+                        isValidClubHubEventWrite() &&
+                        canEditClubHubPage(resource.data.clubSlug) &&
+                        request.resource.data.clubSlug == resource.data.clubSlug &&
+                        request.resource.data.createdAt == resource.data.createdAt &&
+                        request.resource.data.createdBy == resource.data.createdBy;
+        allow delete: if isAuthenticated() &&
+                        canEditClubHubPage(resource.data.clubSlug);
+      }
+
+      function isValidClubHubMembershipWrite() {
+        return request.resource.data.clubSlug is string &&
+              request.resource.data.clubSlug.size() > 0 &&
+              request.resource.data.clubSlug.size() <= 120 &&
+              request.resource.data.clubName is string &&
+              request.resource.data.clubName.size() > 0 &&
+              request.resource.data.clubName.size() <= 120 &&
+              request.resource.data.userId is string &&
+              request.resource.data.userId == request.auth.uid &&
+              request.resource.data.userEmail is string &&
+              request.resource.data.userEmail.size() > 0 &&
+              request.resource.data.userEmail.size() <= 128 &&
+              request.resource.data.userEmail == normalizeEmail(request.resource.data.userEmail) &&
+              emailsMatch(request.resource.data.userEmail, request.auth.token.email) &&
+              request.resource.data.displayName is string &&
+              request.resource.data.displayName.size() > 0 &&
+              request.resource.data.displayName.size() <= 100 &&
+              request.resource.data.joinedAt is timestamp;
+      }
+
+      function clubHubMembershipDocIdForWrite() {
+        return request.resource.data.clubSlug + '__' + request.auth.uid;
+      }
+
+      function clubHubMembershipIdForAuthUser(membershipId) {
+        return membershipId.matches('^.+__' + request.auth.uid + '$');
+      }
+
+      match /clubHubMemberships/{membershipId} {
+        // Own doc get must work when the membership doc does not exist yet (pre-join).
+        allow get: if isAuthenticated() && (
+          clubHubMembershipIdForAuthUser(membershipId) ||
+          isClubHubAdmin() ||
+          (resource != null && canEditClubHubPage(resource.data.clubSlug))
+        );
+        allow list: if isAuthenticated() && (
+          isClubHubAdmin() ||
+          resource.data.userId == request.auth.uid ||
+          canEditClubHubPage(resource.data.clubSlug)
+        );
+        allow create: if isAuthenticated() &&
+                        membershipId == clubHubMembershipDocIdForWrite() &&
+                        isValidClubHubMembershipWrite() &&
+                        clubHubCanAcceptNewMember(request.resource.data.clubSlug) &&
+                        !clubHubJoinRequiresApproval(request.resource.data.clubSlug);
+        allow update: if false;
+        allow delete: if isAuthenticated() &&
+                        resource.data.userId == request.auth.uid;
+      }
+
+      function isValidClubHubJoinRequestCreate() {
+        return request.resource.data.clubSlug is string &&
+              request.resource.data.clubSlug.size() > 0 &&
+              request.resource.data.clubSlug.size() <= 120 &&
+              request.resource.data.clubName is string &&
+              request.resource.data.clubName.size() > 0 &&
+              request.resource.data.clubName.size() <= 120 &&
+              request.resource.data.userId is string &&
+              request.resource.data.userId == request.auth.uid &&
+              request.resource.data.userEmail is string &&
+              request.resource.data.userEmail.size() > 0 &&
+              request.resource.data.userEmail.size() <= 128 &&
+              request.resource.data.userEmail == normalizeEmail(request.resource.data.userEmail) &&
+              emailsMatch(request.resource.data.userEmail, request.auth.token.email) &&
+              request.resource.data.displayName is string &&
+              request.resource.data.displayName.size() > 0 &&
+              request.resource.data.displayName.size() <= 100 &&
+              request.resource.data.status == 'pending' &&
+              request.resource.data.requestedAt is timestamp &&
+              clubHubJoinRequiresApproval(request.resource.data.clubSlug) &&
+              clubHubCanAcceptNewMember(request.resource.data.clubSlug) &&
+              !exists(/databases/$(database)/documents/clubHubMemberships/$(request.resource.data.clubSlug + '__' + request.auth.uid));
+      }
+
+      match /clubHubJoinRequests/{requestId} {
+        allow get: if isAuthenticated() && (
+          requestId.matches('^.+__' + request.auth.uid + '$') ||
+          (resource != null && canEditClubHubPage(resource.data.clubSlug))
+        );
+        allow list: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          canEditClubHubPage(resource.data.clubSlug)
+        );
+        allow create: if isAuthenticated() &&
+                        requestId == request.resource.data.clubSlug + '__' + request.auth.uid &&
+                        isValidClubHubJoinRequestCreate();
+        allow update: if false;
+        allow delete: if isAuthenticated() &&
+                        resource.data.userId == request.auth.uid &&
+                        resource.data.status == 'pending';
+      }
+
+      function isValidClubHubMembershipCountFields() {
+        return request.resource.data.clubSlug is string &&
+              request.resource.data.clubSlug.size() > 0 &&
+              request.resource.data.clubSlug.size() <= 120 &&
+              request.resource.data.clubName is string &&
+              request.resource.data.clubName.size() > 0 &&
+              request.resource.data.clubName.size() <= 120 &&
+              request.resource.data.memberCount is int &&
+              request.resource.data.memberCount >= 0 &&
+              request.resource.data.memberCount <= 5000 &&
+              request.resource.data.updatedAt is timestamp;
+      }
+
+      function clubHubHasMembershipForSlug(clubSlug) {
+        return exists(/databases/$(database)/documents/clubHubMemberships/$(clubSlug + '__' + request.auth.uid));
+      }
+
+      function clubHubMembershipDocPath(clubSlug) {
+        return /databases/$(database)/documents/clubHubMemberships/$(clubSlug + '__' + request.auth.uid);
+      }
+
+      function clubHubIsBoardMemberForClub(clubSlug) {
+        return exists(clubHubMembershipDocPath(clubSlug)) &&
+               get(clubHubMembershipDocPath(clubSlug)).data.get('memberGroups', []).hasAny(['board']);
+      }
+
+      // Keep in sync with lib/club-hub/meetingDayBoardAccess.js (requiresBoardFor*).
+      function clubHubGoldMeetingPickNeedsBoard(slug) {
+        return slug == 'hispanic-student-union' ||
+               slug == 'key-club' ||
+               slug == 'national-art-honor-society-nahs';
+      }
+
+      function clubHubMaroonMeetingPickNeedsBoard(slug) {
+        return slug == 'black-student-union-bsu' ||
+               slug == 'interact';
+      }
+
+      function clubHubMeetingGoldSlugAllowed(slug) {
+        return slug == '' ||
+               (clubHubHasMembershipForSlug(slug) &&
+                (!clubHubGoldMeetingPickNeedsBoard(slug) ||
+                 clubHubIsBoardMemberForClub(slug)));
+      }
+
+      function clubHubMeetingMaroonSlugAllowed(slug) {
+        return slug == '' ||
+               (clubHubHasMembershipForSlug(slug) &&
+                (!clubHubMaroonMeetingPickNeedsBoard(slug) ||
+                 clubHubIsBoardMemberForClub(slug)));
+      }
+
+      function isOptionalClubSlugField(value) {
+        return value == '' ||
+              (value is string && value.size() > 0 && value.size() <= 120);
+      }
+
+      function meetingChoiceSwitchNeedsCooldown(oldVal, newVal) {
+        return oldVal != '' && newVal != '' && oldVal != newVal;
+      }
+
+      function isClubHubMeetingChoiceCooldownOk() {
+        return !meetingChoiceSwitchNeedsCooldown(
+                  resource.data.get('goldClubSlug', ''),
+                  request.resource.data.goldClubSlug
+                ) &&
+               !meetingChoiceSwitchNeedsCooldown(
+                  resource.data.get('maroonClubSlug', ''),
+                  request.resource.data.maroonClubSlug
+                ) ||
+               request.time >= resource.data.get('choicesUpdatedAt', timestamp.date(1970, 1, 1)) +
+                 duration.value(30, 'm');
+      }
+
+      function isValidClubHubMeetingChoicesWrite() {
+        return request.resource.data.keys().hasAll(
+                  ['goldClubSlug', 'maroonClubSlug', 'updatedAt', 'choicesUpdatedAt']
+                ) &&
+              isOptionalClubSlugField(request.resource.data.goldClubSlug) &&
+              isOptionalClubSlugField(request.resource.data.maroonClubSlug) &&
+              request.resource.data.updatedAt is timestamp &&
+              request.resource.data.choicesUpdatedAt is timestamp &&
+              clubHubMeetingGoldSlugAllowed(request.resource.data.goldClubSlug) &&
+              clubHubMeetingMaroonSlugAllowed(request.resource.data.maroonClubSlug);
+      }
+
+      match /clubHubMeetingChoices/{uid} {
+        allow read: if isAuthenticated() && request.auth.uid == uid;
+        allow create: if isAuthenticated() &&
+                        request.auth.uid == uid &&
+                        isValidClubHubMeetingChoicesWrite();
+        allow update: if isAuthenticated() &&
+                        request.auth.uid == uid &&
+                        isValidClubHubMeetingChoicesWrite() &&
+                        isClubHubMeetingChoiceCooldownOk();
+        allow delete: if isAuthenticated() && request.auth.uid == uid;
+      }
+
+      match /clubHubMembershipCounts/{slug} {
+        allow read: if true;
+        allow create: if isAuthenticated() &&
+                        request.resource.data.clubSlug == slug &&
+                        isValidClubHubMembershipCountFields() &&
+                        request.resource.data.memberCount == 1 &&
+                        clubHubMembershipCountIncrementAllowed(slug, 1);
+        allow update: if isAuthenticated() &&
+                        request.resource.data.clubSlug == slug &&
+                        isValidClubHubMembershipCountFields() &&
+                        (
+                          (
+                            request.resource.data.memberCount == resource.data.memberCount + 1 &&
+                            clubHubMembershipCountIncrementAllowed(slug, request.resource.data.memberCount)
+                          ) ||
+                          request.resource.data.memberCount == resource.data.memberCount - 1
+                        );
+        allow delete: if isClubHubAdmin();
+      }
+
+      match /clubHubOpportunityEvents/{eventId} {
+        allow read: if resource.data.published != false;
+        allow write: if false;
+      }
+
+      // Seating chart — one chart document per user (doc id = uid)
+      match /seatingCharts/{userId} {
+        allow read: if isAuthenticated() && request.auth.uid == userId;
+        allow create, update: if isAuthenticated() &&
+                                request.auth.uid == userId &&
+                                request.resource.data.ownerId == request.auth.uid &&
+                                request.resource.data.chartName is string &&
+                                request.resource.data.chartName.size() <= 64 &&
+                                request.resource.data.students is list &&
+                                request.resource.data.furniture is list &&
+                                request.resource.data.restrictions is list &&
+                                request.resource.data.updatedAt is timestamp;
+        allow delete: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+
+      match /siteConfig/signupAllowlist {
+        allow read: if true;
+        allow create, update: if isSiteAdmin() &&
+                                request.resource.data.emailAllowlist is map &&
+                                request.resource.data.emailAllowlist.size() <= 200 &&
+                                request.resource.data.updatedAt is timestamp &&
+                                request.resource.data.updatedBy == request.auth.uid;
+        allow delete: if isSiteAdmin();
+      }
+
+      function unicefProfilePath() {
+        return /databases/$(database)/documents/unicefProfiles/$(request.auth.uid);
+      }
+
+      function isUnicefOfficer() {
+        return isSiteAdmin() ||
+          canEditClubHubPage('unicef') ||
+          (isAuthenticated() &&
+            exists(unicefProfilePath()) &&
+            get(unicefProfilePath()).data.role in ['board', 'sponsor']);
+      }
+
+      function unicefMemberKeepsRole() {
+        return request.resource.data.role == resource.data.role;
+      }
+
+      match /unicefSettings/{docId} {
+        allow read: if true;
+        allow create, update: if isUnicefOfficer() && docId == 'config';
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefProfiles/{uid} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                        request.auth.uid == uid &&
+                        request.resource.data.role == 'member';
+        allow update: if isAuthenticated() &&
+                        ((request.auth.uid == uid && unicefMemberKeepsRole()) || isUnicefOfficer());
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefSubmissions/{id} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() &&
+                        request.resource.data.userId == request.auth.uid &&
+                        request.resource.data.status == 'pending' &&
+                        request.resource.data.activityDescription is string &&
+                        request.resource.data.activityDescription.size() >= 10 &&
+                        request.resource.data.activityDescription.size() <= 1000 &&
+                        request.resource.data.hoursCompleted is number &&
+                        request.resource.data.hoursCompleted > 0 &&
+                        request.resource.data.hoursCompleted <= 24 &&
+                        request.resource.data.hourType in ['In Club', 'Out of Club', 'Summer Hours'];
+        allow update: if isUnicefOfficer();
+        allow delete: if isSiteAdmin();
+      }
+
+      match /unicefProofs/{id} {
+        allow read: if isAuthenticated() &&
+                      (resource.data.userId == request.auth.uid || isUnicefOfficer());
+        allow create: if isAuthenticated() &&
+                        request.resource.data.userId == request.auth.uid &&
+                        request.resource.data.imageData is string &&
+                        request.resource.data.imageData.size() > 0 &&
+                        request.resource.data.imageData.size() <= 700000;
+        allow update, delete: if isUnicefOfficer();
+      }
+
+      match /unicefOpportunities/{id} {
+        allow read: if true;
+        allow create, update, delete: if isUnicefOfficer();
+      }
+
+      match /unicefAnnouncements/{id} {
+        allow read: if true;
+        allow create, delete: if isUnicefOfficer();
+        allow update: if false;
+      }
+
       match /{document=**} {
         allow read, write: if false;
       }

@@ -28,15 +28,16 @@ NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL:-$SITE_URL}"
 # Public reCAPTCHA v3 site key (App Check in browser). Override via .env.local if needed.
 NEXT_PUBLIC_RECAPTCHA_SITE_KEY="${NEXT_PUBLIC_RECAPTCHA_SITE_KEY:-6LfPCPMsAAAAAJoZ0jAGk2KGfA42KptDBhTRgz2J}"
 
-BUILD_ENV="NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY},NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN},NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID},NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET},NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID},NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID},NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL},NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY}"
+DEPLOY_ID="${NEXT_DEPLOYMENT_ID:-$(git rev-parse --short HEAD 2>/dev/null || date +%s)}"
+BUILD_ENV="NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY},NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN},NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID},NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET},NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID},NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID},NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL},NEXT_PUBLIC_RECAPTCHA_SITE_KEY=${NEXT_PUBLIC_RECAPTCHA_SITE_KEY},NEXT_DEPLOYMENT_ID=${DEPLOY_ID}"
 
-RUNTIME_ENV="$BUILD_ENV"
+RUNTIME_ENV="${BUILD_ENV},CLUB_ROSTER_SPREADSHEET_ID=${CLUB_ROSTER_SPREADSHEET_ID:-1fdVX9URoMzroPllhTuZzINXzdpekwgoO_BDmF9NBN6c}"
 
 echo "→ gcloud project: $PROJECT_ID"
 gcloud config set project "$PROJECT_ID" >/dev/null
 
 echo "→ Enabling APIs (idempotent)"
-gcloud services enable run.googleapis.com firebasehosting.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com --quiet
+gcloud services enable run.googleapis.com firebasehosting.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com sheets.googleapis.com --quiet
 
 echo "→ Deploying Cloud Run service: $SERVICE_ID ($REGION) [Node.js buildpack, no Dockerfile]"
 gcloud run deploy "$SERVICE_ID" \
@@ -50,7 +51,8 @@ gcloud run deploy "$SERVICE_ID" \
   --max-instances 20 \
   --port 8080 \
   --set-build-env-vars "$BUILD_ENV" \
-  --set-env-vars "$RUNTIME_ENV"
+  --set-env-vars "$RUNTIME_ENV" \
+  --set-secrets "WRITING_CENTER_GOOGLE_FORM_SYNC_SECRET=writing-center-google-form-sync:latest,FIREBASE_SERVICE_ACCOUNT_JSON=firebase-service-account-json:latest"
 
 echo "→ Deploying Firebase Hosting (rewrites to Cloud Run)"
 if npx -y firebase-tools@latest deploy --only hosting --project "$PROJECT_ID" --non-interactive 2>/dev/null; then

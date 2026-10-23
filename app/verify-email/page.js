@@ -44,7 +44,6 @@ export default function VerifyEmailPage() {
       });
       setResendSent(true);
     } catch (err) {
-      console.error(err);
     } finally {
       setResending(false);
     }
@@ -80,7 +79,7 @@ export default function VerifyEmailPage() {
       <CenteredMain className="py-8 min-h-0">
         <div className="w-full max-w-md">
           <div className="flex justify-center mb-6">
-            <Image src="/c4c.png" alt="Code4Community" width={56} height={56} />
+            <Image src="/brand/c4c.png" alt="Code4Community" width={56} height={56} />
           </div>
           <h1 className="text-2xl font-bold text-foreground text-center mb-2">
             Waiting for email verification
@@ -101,7 +100,10 @@ export default function VerifyEmailPage() {
 
           <div className="space-y-3">
             {notVerifiedMessage && (
-              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
+              <div
+                role="alert"
+                className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm"
+              >
                 {notVerifiedMessage}
               </div>
             )}
@@ -122,7 +124,7 @@ export default function VerifyEmailPage() {
               {resending ? "Sending…" : "Resend verification email"}
             </button>
             {resendSent && (
-              <p className="text-sm text-center text-green-600 dark:text-green-400">
+              <p className="text-sm text-center text-green-600 dark:text-green-400" role="status">
                 Verification email sent. Check your inbox.
               </p>
             )}

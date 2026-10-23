@@ -1,8 +1,9 @@
+import { Suspense } from "react";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/components/layout/ErrorBoundary";
+import FirebaseAnalytics from "@/components/common/FirebaseAnalytics";
 import { AuthProvider } from "@/utils/AuthContext";
-import { getPublicFirebaseConfig, getRecaptchaSiteKey } from "@/lib/firebaseConfig";
 
 // Security headers are configured in next.config.mjs
 
@@ -24,38 +25,31 @@ const inter = Inter({
 export const metadata = {
   title: "Code4Community",
   description: "At Code4Community, we build donor management systems, volunteer platforms, program dashboards, and custom software for nonprofits and organizations.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community.net'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://code4community26.web.app'),
   alternates: {
     canonical: '/',
   },
   icons: {
     icon: [
-      { url: '/c4c.png', sizes: '32x32', type: 'image/png' },
-      { url: '/c4c.png', sizes: '16x16', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '32x32', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '16x16', type: 'image/png' },
     ],
     apple: [
-      { url: '/c4c.png', sizes: '180x180', type: 'image/png' },
+      { url: '/brand/c4c.png', sizes: '180x180', type: 'image/png' },
     ],
   },
 };
 
 export const viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 };
 
 export default function RootLayout({ children }) {
-  const firebaseConfig = getPublicFirebaseConfig();
-  const recaptchaSiteKey = getRecaptchaSiteKey();
-  const runtimeFirebaseScript = `window.__FIREBASE_CONFIG__=${JSON.stringify(firebaseConfig)};window.__RECAPTCHA_SITE_KEY__=${JSON.stringify(recaptchaSiteKey)};`;
-
   return (
     <html lang="en">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: runtimeFirebaseScript }} />
-      </head>
       <body
         className={`${inter.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
       >

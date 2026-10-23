@@ -1,10 +1,10 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import Link from "next/link";
 import BroadRunClubDirectory from "@/components/club-hub/BroadRunClubDirectory";
-
-const MAROON = "#5c1417";
+import ClubHubNav from "@/components/club-hub/ClubHubNav";
+import ClubHubSkipLink from "@/components/club-hub/ClubHubSkipLink";
+import { CLUB_HUB_MAIN_ID } from "@/lib/club-hub/a11y";
 
 export default function ClubHubDirectoryPage() {
   useLayoutEffect(() => {
@@ -13,31 +13,16 @@ export default function ClubHubDirectoryPage() {
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
-      <nav className="border-b border-black/10 shadow-md" style={{ backgroundColor: MAROON }}>
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-8 px-4 py-3.5 text-sm font-semibold tracking-wide text-white sm:gap-12 sm:text-base md:gap-16">
-          <Link href="/club-hub" className="hover:underline underline-offset-4">
-            Home
-          </Link>
-          <span className="cursor-default opacity-95 underline decoration-white underline-offset-4">Club Directory</span>
-          <Link href="/login?redirectTo=%2Fclub-hub%2Fdirectory" className="hover:underline underline-offset-4">
-            Log in
-          </Link>
-        </div>
-      </nav>
+      <ClubHubSkipLink />
+      <ClubHubNav active="directory" loginRedirect="/club-hub/directory" />
 
-      <main className="mx-auto w-full max-w-[90vw] px-4 pb-12 pt-10 sm:px-6 sm:pt-12">
+      <main
+        id={CLUB_HUB_MAIN_ID}
+        className="mx-auto w-full max-w-[90vw] px-4 pb-12 pt-10 sm:px-6 sm:pt-12"
+      >
+        <h1 className="sr-only">Broad Run Club Directory</h1>
         <BroadRunClubDirectory />
       </main>
-
-      <footer className="border-t border-neutral-200 bg-white py-6 text-center text-xs text-neutral-500">
-        <Link href="/club-hub" className="text-[#5c1417] hover:underline">
-          ← Broad Run Club Hub
-        </Link>
-        <span className="mx-2 text-neutral-300">·</span>
-        <Link href="/" className="hover:underline">
-          Code4Community home
-        </Link>
-      </footer>
     </div>
   );
 }

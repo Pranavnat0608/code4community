@@ -1,11 +1,12 @@
 "use client";
 
 import { useLayoutEffect, useState, useEffect, useCallback } from "react";
+import { useRunEffect } from "@/hooks/useRunEffect";
 import { useRouter } from "next/navigation";
 import { AppPageLayout, ContainerMain } from "@/components/common/AppPageLayout";
 import FullPageLoading from "@/components/common/FullPageLoading";
+import ClubHubStudentModeSettings from "@/components/settings/ClubHubStudentModeSettings";
 import { useAuth } from "@/utils/AuthContext";
-import StudyStatsSection from "@/components/settings/StudyStatsSection";
 import {
   auth,
   updateProfile,
@@ -48,7 +49,7 @@ export default function SettingsPage() {
     document.title = "Code4Community | Settings";
   }, []);
 
-  useEffect(() => {
+  useRunEffect(() => {
     if (authLoading) return;
     if (!user) {
       router.replace("/login");
@@ -197,6 +198,8 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">Settings</h1>
           <p className="text-muted-foreground mb-8">Manage your account details.</p>
 
+          <ClubHubStudentModeSettings />
+
           <button
             type="button"
             onClick={openPersonalModal}
@@ -234,8 +237,6 @@ export default function SettingsPage() {
               </svg>
             </span>
           </button>
-
-          <StudyStatsSection user={user} />
         </div>
       </ContainerMain>
 
@@ -300,7 +301,10 @@ export default function SettingsPage() {
                     />
                   </div>
                   {nameMessage && (
-                    <p className={`text-sm ${nameMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                    <p
+                      role={nameMessage.type === "success" ? "status" : "alert"}
+                      className={`text-sm ${nameMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
+                    >
                       {nameMessage.text}
                     </p>
                   )}
@@ -344,7 +348,10 @@ export default function SettingsPage() {
                       />
                     </div>
                     {emailMessage && (
-                      <p className={`text-sm ${emailMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                      <p
+                        role={emailMessage.type === "success" ? "status" : "alert"}
+                        className={`text-sm ${emailMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
+                      >
                         {emailMessage.text}
                       </p>
                     )}
@@ -408,7 +415,10 @@ export default function SettingsPage() {
                         />
                       </div>
                       {passwordMessage && (
-                        <p className={`text-sm ${passwordMessage.type === "success" ? "text-green-600" : "text-red-600"}`}>
+                        <p
+                          role={passwordMessage.type === "success" ? "status" : "alert"}
+                          className={`text-sm ${passwordMessage.type === "success" ? "text-green-600" : "text-red-600"}`}
+                        >
                           {passwordMessage.text}
                         </p>
                       )}

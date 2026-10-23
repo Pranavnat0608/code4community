@@ -1,0 +1,154 @@
+      
+      // Helper function to check if user is a Math Lab tutor
+      function isTutor() {
+        return isAuthenticated() && 
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mathLabRole == 'tutor' ||
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher' ||
+                isMathLabAdmin());
+      }
+
+      function canReadTutoringRequest() {
+        return isAuthenticated() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.status == 'pending' ||
+          // Tutors can see the lab-wide active board (accepted sessions)
+          (isTutor() && resource.data.status == 'accepted') ||
+          (isTutor() && resource.data.tutorId == request.auth.uid) ||
+          isMathLabStaff() ||
+          isAdminByEmail()
+        );
+      }
+      
+      // Helper function to check if user is a student (by mathLabRole or default role)
+      function isStudent() {
+        return isAuthenticated() && 
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.mathLabRole == 'student' ||
+                (!('mathLabRole' in get(/databases/$(database)/documents/users/$(request.auth.uid)).data) && 
+                get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'));
+      }
+      
+      // Library Pass / teacher staff (not product-scoped Math Lab admins).
+      function isTeacherOrAdmin() {
+        return isSiteAdmin() ||
+              (isAuthenticated() &&
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'TEACHER']);
+      }
+
+      function isMathLabStaff() {
+        return isMathLabAdmin() ||
+              (isAuthenticated() &&
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['teacher', 'TEACHER']);
+      }
+      
+      // Users collection - Contains user profile data
+      match /users/{userId} {
+        // Own profile, admins, or public teacher directory (for receipt sharing)
+        allow read: if isAuthenticated() && (
+                          isOwner(userId) ||
+                          isSiteAdmin() ||
+                          isMathLabAdmin() ||
+                          isWritingCenterAdmin() ||
+                          (resource.data.role is string &&
+                            resource.data.role in ['teacher', 'TEACHER'])
+                        );
+        
+        // Allow create: During signup process
+        allow create: if isAuthenticated() && 
+                        isOwner(userId) &&
+                        // Validate required fields
+                        request.resource.data.keys().hasAll(['email', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+                        // Validate field types and values
+                        request.resource.data.email is string &&
+                        isValidEmail(request.resource.data.email) &&
+                        request.resource.data.displayName is string &&
+                        request.resource.data.displayName.size() > 0 &&
+                        request.resource.data.displayName.size() <= 100 &&
+                        request.resource.data.role is string &&
+                        isValidRole(request.resource.data.role) &&
+                        request.resource.data.createdAt is timestamp &&
+                        request.resource.data.updatedAt is timestamp &&
+                        // Email must match auth (case-insensitive); stored profile email is lowercase
+                        request.resource.data.email is string &&
+                        request.resource.data.email == normalizeEmail(request.resource.data.email) &&
+                        emailsMatch(request.resource.data.email, request.auth.token.email) &&
+                        (isAllowedSignupEmail(request.auth.token.email) || isAdminByEmail()) &&
+                        // Allow admin/teacher via pending grants, built-in admins, or default student
+                        (isAdminByEmail() ||
+                          (request.resource.data.role == 'student' &&
+                            request.resource.data.get('mathLabAdmin', false) != true &&
+                            request.resource.data.get('writingCenterAdmin', false) != true) ||
+                          (request.resource.data.role == 'teacher' && hasPendingTeacherGrant())) &&
+                        (!('mathLabAdmin' in request.resource.data) ||
+                          request.resource.data.mathLabAdmin is bool) &&
+                        (!('writingCenterAdmin' in request.resource.data) ||
+                          request.resource.data.writingCenterAdmin is bool) &&
+                        (request.resource.data.get('mathLabAdmin', false) != true ||
+                          hasPendingAdminGrant()) &&
+                        (request.resource.data.get('writingCenterAdmin', false) != true ||
+                          hasPendingWritingCenterAdminGrant()) &&
+                        // mathLabRole on signup: empty, or tutor when pre-approved for Math Lab
+                        (!('mathLabRole' in request.resource.data) ||
+                          (request.resource.data.mathLabRole is string &&
+                            isValidMathLabRole(request.resource.data.mathLabRole) &&
+                            (request.resource.data.mathLabRole == '' ||
+                              (request.resource.data.mathLabRole == 'tutor' &&
+                                pendingTutorServicesInclude('mathlab'))))) &&
+                        // writingCenterRole on signup: empty, or tutor when pre-approved for WC
+                        (!('writingCenterRole' in request.resource.data) ||
+                          (request.resource.data.writingCenterRole is string &&
+                            isValidWritingCenterRole(request.resource.data.writingCenterRole) &&
+                            (request.resource.data.writingCenterRole == '' ||
+                              (request.resource.data.writingCenterRole == 'tutor' &&
+                                pendingTutorServicesInclude('writing-center')))));
+        
+        // Allow update: Own document with restrictions, or admin updates
+        allow update: if isAuthenticated() && (
+                          // Own document updates
+                          (isOwner(userId) &&
+                          // Prevent changing critical fields
+                          request.resource.data.email == resource.data.email &&
+                          request.resource.data.createdAt == resource.data.createdAt &&
+                          // Validate updated fields
+                          request.resource.data.displayName is string &&
+                          request.resource.data.displayName.size() > 0 &&
+                          request.resource.data.displayName.size() <= 100 &&
+                          request.resource.data.role is string &&
+                          isValidRole(request.resource.data.role) &&
+                          request.resource.data.updatedAt is timestamp &&
+                          // Only allow role changes by admins or prevent role escalation
+                          (isAdminByEmail() || request.resource.data.role == resource.data.role) &&
+                          // writingCenterRole is admin-managed only (owners cannot self-grant)
+                          writingCenterRoleValue(request.resource.data) == writingCenterRoleValue(resource.data) &&
+                          // studyHallBlocks is admin-managed only
+                          studyHallBlocksValue(request.resource.data) == studyHallBlocksValue(resource.data) &&
+                          // Validate optional fields if present
+                          (!('mathLabRole' in request.resource.data) || 
+                            (request.resource.data.mathLabRole is string && 
+                            isValidMathLabRole(request.resource.data.mathLabRole))) &&
+                          (!('writingCenterRole' in request.resource.data) ||
+                            (request.resource.data.writingCenterRole is string &&
+                            isValidWritingCenterRole(request.resource.data.writingCenterRole))) &&
+                          (!('photoURL' in request.resource.data) || 
+                            (request.resource.data.photoURL is string && 
+                            request.resource.data.photoURL.size() <= 500)) &&
+                          clubHubStudentModeFieldOk()) ||
+                          // Product / site admins (built-in admins are protected)
+                          (isSiteAdmin() && protectedAdminTeamFieldsUnchanged()) ||
+                          (isMathLabAdmin() &&
+                            protectedAdminTeamFieldsUnchanged() &&
+                            boolProfileFieldUnchanged('writingCenterAdmin') &&
+                            request.resource.data.role != 'admin') ||
+                          (isWritingCenterAdmin() &&
+                            protectedAdminTeamFieldsUnchanged() &&
+                            boolProfileFieldUnchanged('mathLabAdmin') &&
+                            mathLabRoleValue(request.resource.data) == mathLabRoleValue(resource.data) &&
+                            request.resource.data.role == resource.data.role)
+                        );
+        
+        // Allow delete: Only admins can delete users
+        allow delete: if isAdminByEmail();
+      }

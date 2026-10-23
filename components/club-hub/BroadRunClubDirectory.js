@@ -1,16 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { BROAD_RUN_CLUBS } from "@/lib/broadRunClubDirectory";
+import Link from "next/link";
+import { getClubsGroupedByMeetingDay } from "@/lib/club-hub/clubDirectorySections";
+import { useMeetingDayOverrides } from "@/lib/club-hub/clubMeetingDays";
+/**
+ * @param {{ clubs: { name: string, slug: string, key: string }[], buttonClassName: string }} props
+ */
+function ClubLinkGrid({ clubs, buttonClassName }) {
+  if (!clubs.length) return null;
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 lg:gap-4">
+      {clubs.map((club) => (
+        <Link
+          key={club.key}
+          href={`/club-hub/directory/${club.slug}`}
+          className={`flex min-h-[3.5rem] items-center justify-center rounded-[10px] px-2 py-3 text-center text-[11px] font-semibold leading-snug text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5c1417] focus-visible:ring-offset-2 sm:min-h-[3.75rem] sm:text-xs md:text-sm ${buttonClassName}`}
+        >
+          <span className="line-clamp-4">{club.name}</span>
+        </Link>
+      ))}
+    </div>
+  );
+}
 
-const MAROON = "#5c1417";
+/**
+ * @param {{ id: string, title: string, subtitle?: string, children: React.ReactNode }} props
+ */
+function DirectorySection({ id, title, subtitle, children }) {
+  return (
+    <section className="mt-10 first:mt-6" aria-labelledby={id}>
+      <div className="border-y border-neutral-900 py-4 sm:py-5">
+        <h2
+          id={id}
+          className="text-center text-base font-bold uppercase tracking-[0.06em] text-[#5c1417] sm:text-lg"
+        >
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="mt-2 text-center text-sm text-neutral-700">{subtitle}</p>
+        ) : null}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function BroadRunClubDirectory() {
-  const [selected, setSelected] = useState(null);
+  useMeetingDayOverrides();
+  const { gold, maroon, general } = getClubsGroupedByMeetingDay();
 
   return (
     <>
-      {/* Section title between full-width rules — reference “club directory” */}
       <div className="border-y border-neutral-900 py-4 sm:py-5">
         <h2 className="text-center text-base font-bold uppercase tracking-[0.06em] text-[#5c1417] sm:text-lg">
           Broad Run Club List
@@ -18,69 +58,30 @@ export default function BroadRunClubDirectory() {
       </div>
 
       <p className="sr-only">
-        Club buttons below; activate a button to view sponsor names and email addresses.
+        Clubs grouped by Gold day, Maroon day, and general meetings. Open a club page for details
+        and sponsors.
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 lg:gap-4">
-        {BROAD_RUN_CLUBS.map((club) => (
-          <button
-            key={club.name}
-            type="button"
-            onClick={() => setSelected(club)}
-            className="min-h-[3.5rem] rounded-[10px] px-2 py-3 text-center text-[11px] font-semibold leading-snug text-white transition-colors hover:bg-[#731a1f] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#5c1417] focus-visible:ring-offset-2 sm:min-h-[3.75rem] sm:text-xs md:text-sm"
-            style={{ backgroundColor: MAROON }}
-          >
-            <span className="line-clamp-4">{club.name}</span>
-          </button>
-        ))}
-      </div>
+      <DirectorySection id="club-directory-gold" title="Gold Clubs">
+        <ClubLinkGrid
+          clubs={gold}
+          buttonClassName="bg-[#9a7b2f] hover:bg-[#7d6325]"
+        />
+      </DirectorySection>
 
-      {selected ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="club-detail-title"
-          onClick={() => setSelected(null)}
-        >
-          <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto border border-neutral-400 bg-white p-5 shadow-md sm:p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="club-detail-title" className="text-lg font-bold text-[#5c1417]">
-              {selected.name}
-            </h3>
-            <p className="mt-1 text-xs text-neutral-600">Sponsor(s)</p>
-            <table className="mt-4 w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-neutral-300">
-                  <th className="py-2 pr-3 font-semibold text-neutral-800">Name</th>
-                  <th className="py-2 font-semibold text-neutral-800">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selected.sponsors.map((s) => (
-                  <tr key={`${selected.name}-${s.email}`} className="border-b border-neutral-200">
-                    <td className="py-2 pr-3 align-top text-neutral-900">{s.name}</td>
-                    <td className="py-2 align-top">
-                      <a href={`mailto:${s.email}`} className="break-all text-[#5c1417] underline underline-offset-2 hover:text-[#731a1f]">
-                        {s.email}
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <button
-              type="button"
-              className="mt-5 w-full border border-neutral-400 bg-white py-2.5 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
-              onClick={() => setSelected(null)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
+      <DirectorySection id="club-directory-maroon" title="Maroon Clubs">
+        <ClubLinkGrid
+          clubs={maroon}
+          buttonClassName="bg-[#5c1417] hover:bg-[#731a1f]"
+        />
+      </DirectorySection>
+
+      <DirectorySection id="club-directory-general" title="General clubs">
+        <ClubLinkGrid
+          clubs={general}
+          buttonClassName="bg-neutral-700 hover:bg-neutral-800"
+        />
+      </DirectorySection>
     </>
   );
 }

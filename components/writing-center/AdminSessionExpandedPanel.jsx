@@ -1,5 +1,6 @@
 "use client";
 
+import { formatSessionDate } from "@/lib/firestoreDates";
 import { isAsyncFormSession } from "@/lib/writing-center/form";
 import { getSessionReportUrl } from "@/lib/writing-center/sessionReport";
 
@@ -21,7 +22,31 @@ function TutorReceiptLine({ session }) {
   );
 }
 
-/** Admin Sessions tab — expanded row details (async / in-person). */
+const PASS_TIMES = [
+  ["Out", "hallPassStartedAt"],
+  ["In", "hallPassInAt"],
+  ["Left", "hallPassLeftAt"],
+  ["Ended", "hallPassEndedAt"],
+];
+
+function HallPassTimes({ session }) {
+  if (session?.sessionType !== "IN_PERSON") return null;
+  const recorded = PASS_TIMES.some(([, field]) => session[field]);
+  if (!recorded) return null;
+
+  return (
+    <dl className="m-0 grid grid-cols-[4.5rem_1fr] gap-x-3 gap-y-1 text-sm text-gray-600">
+      {PASS_TIMES.map(([label, field]) => (
+        <div key={field} className="contents">
+          <dt className="font-medium text-gray-700">{label}</dt>
+          <dd className="m-0 tabular-nums">{formatSessionDate(session[field], "—")}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Admin History tab — expanded row details (async / in-person). */
 export function AdminSessionExpandedPanel({ session, formResponseUrl }) {
   if (isAsyncFormSession(session)) {
     return (
@@ -46,6 +71,7 @@ export function AdminSessionExpandedPanel({ session, formResponseUrl }) {
 
   return (
     <div className="flex flex-col items-start gap-2">
+      <HallPassTimes session={session} />
       <TutorReceiptLine session={session} />
     </div>
   );

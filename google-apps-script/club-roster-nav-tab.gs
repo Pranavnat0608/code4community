@@ -1,5 +1,6 @@
 /**
- * Club Rosters workbook — build a "Home" tab linking to every club roster tab.
+ * Club Rosters workbook — build a "Home" tab linking to each seminar club tab.
+ * General clubs are not given roster tabs, so they stay off this list.
  * Bound to: https://docs.google.com/spreadsheets/d/1fdVX9URoMzroPllhTuZzINXzdpekwgoO_BDmF9NBN6c
  *
  * Setup: Extensions → Apps Script → paste this file → Run buildClubRosterNavTab once → authorize.
@@ -18,7 +19,31 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("Club Rosters")
     .addItem("Rebuild Home links", "buildClubRosterNavTab")
+    .addItem("Fit columns on every tab", "fitColumnsOnEveryTab")
     .addToUi();
+}
+
+/** Widen each visible column to its text, on every tab. */
+function fitColumnsOnEveryTab() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheets = ss.getSheets();
+  var fitted = 0;
+
+  for (var i = 0; i < sheets.length; i++) {
+    var sheet = sheets[i];
+    var lastCol = sheet.getLastColumn();
+    if (lastCol < 1) continue;
+
+    for (var col = 1; col <= lastCol; col++) {
+      if (sheet.isColumnHiddenByUser(col)) continue;
+      sheet.autoResizeColumn(col);
+      var width = sheet.getColumnWidth(col) + 24;
+      sheet.setColumnWidth(col, Math.min(width, 520));
+    }
+    fitted++;
+  }
+
+  SpreadsheetApp.getUi().alert("Fitted columns on " + fitted + " tabs.");
 }
 
 function buildClubRosterNavTab() {

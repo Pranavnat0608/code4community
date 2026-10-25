@@ -83,31 +83,21 @@ export default function GradeCalculator() {
   });
 
   const WEIGHT_PLANS = {
-    "80/10/10": {
-      name: "LCPS (80/10/10)",
-      weights: { "Major Summative": 80, "Minor Summative": 10, "Graded Formative": 10 },
-      description: "LCPS secondary default: Major assessments 80%, Minor assessments 10%, Formatives 10%"
-    },
     "50/40/10": {
-      name: "Standard (50/40/10)",
+      name: "50/40/10",
       weights: { "Major Summative": 50, "Minor Summative": 40, "Graded Formative": 10 },
-      description: "Most common weighting scheme: Major assessments 50%, Minor assessments 40%, Formatives 10%"
-    },
-    "65/30/5": {
-      name: "65/30/5",
-      weights: { "Major Summative": 65, "Minor Summative": 30, "Graded Formative": 5 },
-      description: "Emphasizes major assessments: 65% Major, 30% Minor, 5% Formative"
+      description: "Major assessments 50%, Minor assessments 40%, Formatives 10%"
     },
     "60/30/10": {
       name: "60/30/10",
       weights: { "Major Summative": 60, "Minor Summative": 30, "Graded Formative": 10 },
-      description: "Balanced approach: 60% Major, 30% Minor, 10% Formative"
+      description: "Major assessments 60%, Minor assessments 30%, Formatives 10%"
     },
-    "75/24/1": {
-      name: "75/24/1",
-      weights: { "Major Summative": 75, "Minor Summative": 24, "Graded Formative": 1 },
-      description: "Heavily weighted toward major assessments: 75% Major, 24% Minor, 1% Formative"
-    }
+    "80/10/10": {
+      name: "80/10/10",
+      weights: { "Major Summative": 80, "Minor Summative": 10, "Graded Formative": 10 },
+      description: "LCPS secondary default: Major assessments 80%, Minor assessments 10%, Formatives 10%"
+    },
   };
 
   // Close filter menu when clicking outside
@@ -654,11 +644,6 @@ export default function GradeCalculator() {
     }
   };
 
-  const updateCategoryWeight = (category, value) => {
-    setCategoryWeights({ ...categoryWeights, [category]: value === "" ? "" : parseFloat(value) || 0 });
-    setSelectedWeightPlan("Other");
-  };
-
   const updateAssignmentScore = (id, newEarned, newPossible) => {
     setAssignments(assignments.map(a => 
       a.id === id 
@@ -762,11 +747,6 @@ export default function GradeCalculator() {
   const deleteAssignment = (id) => {
     setAssignments(assignments.filter(a => a.id !== id));
   };
-
-  const categories = [...new Set([...Object.keys(categoryWeights), ...assignments.map(a => a.category)])];
-  const gradedCategories = categories.filter(c =>
-    c !== "Extra Credit" && assignments.some(a => a.category === c)
-  );
 
   // Both grades use the live weights, so fixing a weight or category updates the current grade too
   const currentPercent = calculateGrade(originalAssignments, categoryWeights, useWeightedGrading);
@@ -884,55 +864,6 @@ export default function GradeCalculator() {
                     </p>
                   )}
                 </div>
-              </div>
-
-              <div className="rounded-2xl border border-border bg-background p-4 shadow-sm md:p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Category weights</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">Plan: {weightPlanName}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      onClick={() => setShowWeightPlanModal(true)}
-                      className="rounded-lg border border-border bg-secondary px-3.5 py-2 text-sm font-medium text-secondary-foreground transition hover:bg-secondary/90"
-                    >
-                      Change plan
-                    </button>
-                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={useWeightedGrading}
-                        onChange={(e) => setUseWeightedGrading(e.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      Weighted grading
-                    </label>
-                  </div>
-                </div>
-                {useWeightedGrading && (
-                  <>
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {gradedCategories.map((category) => (
-                        <label key={category} className="flex items-center gap-2 text-sm text-foreground">
-                          {category}
-                          <input
-                            type="number"
-                            value={categoryWeights[category] ?? 0}
-                            onChange={(e) => updateCategoryWeight(category, e.target.value)}
-                            className="w-20 rounded-lg border border-border bg-background px-2 py-1.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            step="any"
-                            min="0"
-                          />
-                          %
-                        </label>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Categories with no graded work are left out and the remaining weights are scaled up, the same way Synergy does it.
-                    </p>
-                  </>
-                )}
               </div>
 
               <div className="rounded-2xl border border-border bg-background p-4 shadow-sm md:p-5">
@@ -1119,30 +1050,26 @@ export default function GradeCalculator() {
 
       {isClient && showWeightPlanModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="mx-4 max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-lg">
+          <div className="mx-4 w-full max-w-2xl rounded-2xl border border-border bg-background p-6 shadow-lg">
             <h2 className="mb-2 text-2xl font-bold text-foreground">Select Weight Plan</h2>
             <p className="mb-6 text-sm text-muted-foreground">Choose the grading scheme your teacher uses for this course.</p>
             
-            <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="mb-6 grid grid-cols-2 gap-3">
               {Object.entries(WEIGHT_PLANS).map(([key, plan]) => (
                 <button
                   key={key}
                   onClick={() => handleWeightPlanSelect(key)}
-                  className="group relative rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+                  className="flex min-h-[7.25rem] items-center rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
                   title={plan.description}
                 >
-                  <div className="font-semibold text-foreground">{plan.name}</div>
-                  <div className="mt-1 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
-                    {plan.description}
-                  </div>
+                  <div className="text-lg font-semibold text-foreground">{plan.name}</div>
                 </button>
               ))}
               <button
                 onClick={() => handleWeightPlanSelect("Other")}
-                className="rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
+                className="flex min-h-[7.25rem] items-center rounded-xl border border-border bg-background p-4 text-left transition hover:border-primary hover:bg-primary/5"
               >
-                <div className="font-semibold text-foreground">Other (Custom)</div>
-                <div className="mt-1 text-xs text-muted-foreground">Enter your own weight percentages</div>
+                <div className="text-lg font-semibold text-foreground">Custom</div>
               </button>
             </div>
 

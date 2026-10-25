@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireClubHubAdminFromRequest } from "@/lib/club-hub/clubHubAdminRouteAuth";
 import { setClubMeetingDayAndClearSignups } from "@/lib/club-hub/clubMeetingDaysServer";
+import { ensureAllClubRosterTabs } from "@/lib/club-hub/rosterSheetSync";
 import { syncStudentMeetingRowsToSheet } from "@/lib/club-hub/meetingChoicesSheetSync";
 import { withRateLimit } from "@/utils/rateLimit";
 
@@ -35,6 +36,15 @@ async function postHandler(request) {
         sheetWarning =
           sheet.error || "Signups were cleared, but the Student meeting clubs sheet did not update.";
       }
+    }
+    try {
+      const tabs = await ensureAllClubRosterTabs();
+      if (!tabs.ok) {
+        sheetWarning = sheetWarning || tabs.error || "Seminar roster tabs did not update.";
+      }
+    } catch (err) {
+      sheetWarning =
+        sheetWarning || (err instanceof Error ? err.message : "Seminar roster tabs did not update.");
     }
 
     return NextResponse.json({

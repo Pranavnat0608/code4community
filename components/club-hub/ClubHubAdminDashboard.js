@@ -131,7 +131,7 @@ export default function ClubHubAdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold text-neutral-900">Club Hub admin</h1>
         <p className="mt-2 text-sm leading-relaxed text-neutral-700">
-          Manage coordinators, per-club rosters, and Gold / Maroon / General meeting days. New clubs can be added from Meeting days. Seminar columns are on the Student meeting clubs sheet.
+          Manage coordinators, per-club rosters, and Gold / Maroon / General meeting days. New clubs can be added from Meeting days. The spreadsheet has a tab for each club that meets during seminar, plus Student meeting clubs.
         </p>
         <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Club Hub admin sections">
           <button

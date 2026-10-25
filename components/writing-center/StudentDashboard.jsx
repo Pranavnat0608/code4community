@@ -34,6 +34,8 @@ import { invalidateOnDataChange } from "@/utils/cacheInvalidation";
 import { WritingCenterRequestChooser } from "./WritingCenterRequestChooser";
 import { WritingCenterPassCard } from "./WritingCenterPassCard";
 import { endWritingCenterPass } from "@/lib/writing-center/hallPass";
+import { HALL_PASS_AUTO_CLOSE_MS } from "@/lib/writing-center/hallPassTiming";
+import { useExpireStaleHallPasses } from "@/lib/writing-center/useExpireStaleHallPasses";
 
 export default function StudentDashboard({ preview = false, asUser = null, mode = "home" }) {
   const [liveSessions, setLiveSessions] = useState([]);
@@ -162,6 +164,18 @@ export default function StudentDashboard({ preview = false, asUser = null, mode 
     WritingCenterCache.setSessionsForUser(user.uid, sessions);
   }, [sessions, user?.uid, preview]);
 
+  useExpireStaleHallPasses(preview ? [] : liveSessions, (session) => {
+    const started = firestoreToDate(session.hallPassStartedAt);
+    if (!started) return;
+    setKeptEndedPass({
+      id: session.id,
+      studentName: session.studentName,
+      startedAt: started,
+      endedAt: new Date(started.getTime() + HALL_PASS_AUTO_CLOSE_MS),
+    });
+    setLiveSessions((prev) => prev.filter((row) => row.id !== session.id));
+  });
+
   const studentDisplayName =
     resolveDisplayName(userData, "") ||
     user?.displayName ||
@@ -190,7 +204,7 @@ export default function StudentDashboard({ preview = false, asUser = null, mode 
   const passMarkedOut = Boolean(activePass && firestoreToDate(activePass.hallPassLeftAt));
 
   const handleEndPass = async () => {
-    if (!activePass || endingPass || preview || !passMarkedOut || passEndedAt) return;
+    if (!activePass || endingPass || preview || !passStartedAt || passEndedAt) return;
     const ended = new Date();
     const pass = activePass;
     setEndingPass(true);
@@ -399,7 +413,7 @@ export default function StudentDashboard({ preview = false, asUser = null, mode 
               inRoom={Boolean(activePass.hallPassInAt) && !passMarkedOut}
               markedOut={passMarkedOut}
               onStart={preview ? undefined : handleStartPass}
-              onStop={preview || !passMarkedOut ? undefined : handleEndPass}
+              onStop={preview || !passStartedAt ? undefined : handleEndPass}
               stopping={endingPass}
               onCancel={preview ? undefined : () => handleCancel(activePass.id)}
               starting={startingPass}

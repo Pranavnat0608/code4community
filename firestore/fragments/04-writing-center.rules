@@ -106,16 +106,50 @@
               ]);
       }
 
+      function hallPassAutoCloseStart() {
+        return resource.data.get('hallPassStartedAt', null) is timestamp
+          ? resource.data.hallPassStartedAt
+          : resource.data.createdAt;
+      }
+
+      function isHallPassAutoExpire() {
+        return resource.data.sessionType == 'IN_PERSON' &&
+              resource.data.status in ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] &&
+              !(resource.data.get('hallPassEndedAt', null) is timestamp) &&
+              hallPassAutoCloseStart() is timestamp &&
+              request.time >= hallPassAutoCloseStart() + duration.value(60, 'm') &&
+              request.resource.data.studentId == resource.data.studentId &&
+              (
+                resource.data.studentId == request.auth.uid ||
+                isWritingCenterTutorRole() ||
+                isWritingCenterAdmin()
+              ) &&
+              (
+                (resource.data.hallPassStartedAt is timestamp &&
+                  request.resource.data.status == 'COMPLETED' &&
+                  request.resource.data.hallPassEndedAt == request.time &&
+                  request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                    'hallPassEndedAt', 'status', 'updatedAt'
+                  ])) ||
+                (!(resource.data.get('hallPassStartedAt', null) is timestamp) &&
+                  request.resource.data.status == 'CANCELLED' &&
+                  request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                    'status', 'updatedAt'
+                  ]))
+              );
+      }
+
       function isStudentHallPassEnd() {
         return resource.data.studentId == request.auth.uid &&
               request.resource.data.studentId == resource.data.studentId &&
               resource.data.sessionType == 'IN_PERSON' &&
-              resource.data.hallPassLeftAt is timestamp &&
+              resource.data.hallPassStartedAt is timestamp &&
               !(resource.data.get('hallPassEndedAt', null) is timestamp) &&
               request.resource.data.hallPassEndedAt is timestamp &&
               request.resource.data.status == 'COMPLETED' &&
-              request.resource.data.hallPassLeftAt == resource.data.hallPassLeftAt &&
-              request.resource.data.hallPassInAt == resource.data.hallPassInAt &&
+              request.resource.data.hallPassStartedAt == resource.data.hallPassStartedAt &&
+              request.resource.data.get('hallPassInAt', null) == resource.data.get('hallPassInAt', null) &&
+              request.resource.data.get('hallPassLeftAt', null) == resource.data.get('hallPassLeftAt', null) &&
               request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'hallPassEndedAt', 'status', 'updatedAt'
               ]);
@@ -169,6 +203,7 @@
                             request.resource.data.get('hallPassEndedAt', null) == resource.data.get('hallPassEndedAt', null) &&
                             !(request.resource.data.status == 'COMPLETED' && resource.data.status != 'COMPLETED')) ||
                           isStudentHallPassEnd() ||
+                          isHallPassAutoExpire() ||
                           isHallPassArrivalUpdate() ||
                           isHallPassDepartureUpdate() ||
                           (resource.data.tutorId == request.auth.uid &&

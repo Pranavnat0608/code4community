@@ -9,6 +9,7 @@ import {
   canStartScheduledSession,
   formatScheduleLabel,
 } from "@/lib/mathlab/scheduledRequests";
+import { studyHallLabel } from "@/lib/mathlab/studyHall";
 
 export default function MathLabTutorDashboard({
   livePendingRequests,
@@ -22,8 +23,9 @@ export default function MathLabTutorDashboard({
   acceptingRequestId,
   onAcceptRequest,
   onOpenUpcomingScheduled,
+  liveHelpUnavailable = false,
 }) {
-  const [tutorQueueTab, setTutorQueueTab] = useState("live");
+  const [tutorQueueTab, setTutorQueueTab] = useState(liveHelpUnavailable ? "scheduled" : "live");
   const [scheduleClock, setScheduleClock] = useState(() => Date.now());
 
   useEffect(() => {
@@ -110,9 +112,16 @@ export default function MathLabTutorDashboard({
               <RequestCardSkeleton />
               <RequestCardSkeleton />
             </div>
+          ) : liveHelpUnavailable ? (
+            <div className="text-center py-10 bg-muted/30 rounded-2xl border border-dashed border-border">
+              <p className="text-muted-foreground">
+                Live help is matched by study hall. Without one, you can take scheduled
+                before- and after-school sessions.
+              </p>
+            </div>
           ) : livePendingRequests.length === 0 ? (
             <div className="text-center py-10 bg-muted/30 rounded-2xl border border-dashed border-border">
-              <p className="text-muted-foreground">No live requests right now</p>
+              <p className="text-muted-foreground">No live requests from your study hall right now</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -141,7 +150,10 @@ export default function MathLabTutorDashboard({
                     </span>
                   </div>
                   <div className="flex items-center text-sm text-gray-600 mb-6">
-                    <span>Requested {formatRequestDateTime(request.createdAt)}</span>
+                    <span>
+                      Requested {formatRequestDateTime(request.createdAt)}
+                      {request.studentStudyHall ? ` · ${studyHallLabel(request.studentStudyHall)}` : ""}
+                    </span>
                   </div>
                   <button
                     type="button"

@@ -23,6 +23,7 @@
                         request.resource.data.createdAt is timestamp &&
                         request.resource.data.updatedAt is timestamp &&
                         mathLabScheduleFieldsValid(request.resource.data) &&
+                        mathLabRequestStudyHallOk(request.resource.data) &&
                         // Validate optional fields if present
                         (!('tutorId' in request.resource.data) || 
                         (request.resource.data.tutorId is string && 
@@ -54,7 +55,8 @@
                           request.resource.data.description.size() > 0 &&
                           request.resource.data.description.size() <= 1000 &&
                           request.resource.data.updatedAt is timestamp &&
-                          mathLabScheduleFieldsUnchanged()) ||
+                          mathLabScheduleFieldsUnchanged() &&
+                          mathLabRequestStudyHallUnchanged()) ||
                           // Tutors can update pending requests (to accept them)
                           (isTutor() && 
                           resource.data.status == 'pending' &&
@@ -67,6 +69,8 @@
                           request.resource.data.createdAt == resource.data.createdAt &&
                           request.resource.data.updatedAt is timestamp &&
                           mathLabScheduleFieldsUnchanged() &&
+                          mathLabRequestStudyHallUnchanged() &&
+                          tutorStudyHallMatchesRequest() &&
                           // Validate new fields for accepted status
                           request.resource.data.tutorId is string &&
                           request.resource.data.tutorId == request.auth.uid &&

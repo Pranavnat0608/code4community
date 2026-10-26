@@ -205,6 +205,37 @@
           : [];
       }
 
+      // Self-reported study hall from the one-time Math Lab prompt. Separate from the
+      // admin-managed studyHallBlocks (Library Pass access). Owners may set it once.
+      function reportedStudyHallOk() {
+        return request.resource.data.get('reportedStudyHall', null) == resource.data.get('reportedStudyHall', null) ||
+          (!('reportedStudyHall' in resource.data) &&
+            request.resource.data.reportedStudyHall in ['1', '2', '3', '4', '5', '6', '7', '8', 'none']);
+      }
+
+      function isStudyHallBlock(value) {
+        return value in ['1', '2', '3', '4', '5', '6', '7', '8'];
+      }
+
+      // New Math Lab request: studentStudyHall must match the student's profile, and live
+      // (non-scheduled) requests need a real study hall block.
+      function mathLabRequestStudyHallOk(data) {
+        return data.get('studentStudyHall', null) == authUserData().get('reportedStudyHall', null) &&
+          (data.get('requestType', 'now') == 'scheduled' ||
+            isStudyHallBlock(data.get('studentStudyHall', '')));
+      }
+
+      function mathLabRequestStudyHallUnchanged() {
+        return request.resource.data.get('studentStudyHall', null) == resource.data.get('studentStudyHall', null);
+      }
+
+      // Tutor accepting: live requests only from students in the tutor's own study hall.
+      function tutorStudyHallMatchesRequest() {
+        return resource.data.get('requestType', 'now') == 'scheduled' ||
+          (isStudyHallBlock(authUserData().get('reportedStudyHall', '')) &&
+            authUserData().get('reportedStudyHall', '') == resource.data.get('studentStudyHall', ''));
+      }
+
       function pendingTeamDocPath(email) {
         return /databases/$(database)/documents/mathLabTeamPending/$(email);
       }
@@ -405,6 +436,7 @@
                           writingCenterRoleValue(request.resource.data) == writingCenterRoleValue(resource.data) &&
                           // studyHallBlocks is admin-managed only
                           studyHallBlocksValue(request.resource.data) == studyHallBlocksValue(resource.data) &&
+                          reportedStudyHallOk() &&
                           // Validate optional fields if present
                           (!('mathLabRole' in request.resource.data) || 
                             (request.resource.data.mathLabRole is string && 
@@ -458,6 +490,7 @@
                         request.resource.data.createdAt is timestamp &&
                         request.resource.data.updatedAt is timestamp &&
                         mathLabScheduleFieldsValid(request.resource.data) &&
+                        mathLabRequestStudyHallOk(request.resource.data) &&
                         // Validate optional fields if present
                         (!('tutorId' in request.resource.data) || 
                         (request.resource.data.tutorId is string && 
@@ -489,7 +522,8 @@
                           request.resource.data.description.size() > 0 &&
                           request.resource.data.description.size() <= 1000 &&
                           request.resource.data.updatedAt is timestamp &&
-                          mathLabScheduleFieldsUnchanged()) ||
+                          mathLabScheduleFieldsUnchanged() &&
+                          mathLabRequestStudyHallUnchanged()) ||
                           // Tutors can update pending requests (to accept them)
                           (isTutor() && 
                           resource.data.status == 'pending' &&
@@ -502,6 +536,8 @@
                           request.resource.data.createdAt == resource.data.createdAt &&
                           request.resource.data.updatedAt is timestamp &&
                           mathLabScheduleFieldsUnchanged() &&
+                          mathLabRequestStudyHallUnchanged() &&
+                          tutorStudyHallMatchesRequest() &&
                           // Validate new fields for accepted status
                           request.resource.data.tutorId is string &&
                           request.resource.data.tutorId == request.auth.uid &&

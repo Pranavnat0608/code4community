@@ -16,6 +16,7 @@ import { useMathLabQueue } from "@/lib/mathlab/useMathLabQueue";
 import { useMathLabSession } from "@/lib/mathlab/useMathLabSession";
 import { isMathLabAdminUser } from "@/lib/auth/productAdmins";
 import { isTutorOrHigher } from "@/utils/authorization";
+import { isStudyHallBlock, isStudyHallExempt } from "@/lib/mathlab/studyHall";
 
 function MathLabPageContent() {
   const { user, userData, loading } = useAuth();
@@ -159,6 +160,10 @@ function MathLabPageContent() {
             acceptingRequestId={session.acceptingRequestId}
             onAcceptRequest={session.handleAcceptRequest}
             onOpenUpcomingScheduled={session.handleOpenUpcomingScheduled}
+            liveHelpUnavailable={
+              !isStudyHallExempt(displayUser) &&
+              !isStudyHallBlock(displayUser?.reportedStudyHall)
+            }
           />
         ) : (
           <MathLabStudentDashboard

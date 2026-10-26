@@ -125,6 +125,7 @@
                           writingCenterRoleValue(request.resource.data) == writingCenterRoleValue(resource.data) &&
                           // studyHallBlocks is admin-managed only
                           studyHallBlocksValue(request.resource.data) == studyHallBlocksValue(resource.data) &&
+                          reportedStudyHallOk() &&
                           // Validate optional fields if present
                           (!('mathLabRole' in request.resource.data) || 
                             (request.resource.data.mathLabRole is string && 
